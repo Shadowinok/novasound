@@ -62,3 +62,8 @@ h1, h2, h3 {
   background: var(--neon-purple);
   border-radius: 4px;
 }
+.radial-menu {
+  left: 80px !important;
+  bottom: 50% !important;
+  transform: translateY(50%) !important;
+}
