@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { useCallback } from 'react';
-import Particles from '@tsparticles/react';
-import { loadSlim } from '@tsparticles/slim';
+import Particles from 'tsparticles/react';
+import { loadSlim } from 'tsparticles/slim';
 
 export default function ParticleBackground() {
   const options = useMemo(() => ({
