@@ -63,7 +63,8 @@ h1, h2, h3 {
   border-radius: 4px;
 }
 .radial-menu {
-  left: 80px !important;
-  bottom: 50% !important;
-  transform: translateY(50%) !important;
+  left: 40px !important;      /* как близко к левому краю */
+  top: 80px !important;       /* отступ сверху */
+  bottom: auto !important;    /* отключаем старый bottom */
+  transform: none !important; /* убираем сдвиг по Y */
 }
