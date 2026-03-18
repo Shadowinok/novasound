@@ -1,15 +1,23 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useMemo, useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import client from '../api/client';
+import client, { users as usersApi } from '../api/client';
+import { useAuth } from '../context/AuthContext';
 import TrackCard from '../components/TrackCard';
 import UploadTrack from '../components/UploadTrack';
 
 export default function Profile() {
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const [tracks, setTracks] = useState([]);
   const [statusFilter, setStatusFilter] = useState('');
   const [showUpload, setShowUpload] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showDanger, setShowDanger] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteConfirm, setDeleteConfirm] = useState('');
+  const [dangerError, setDangerError] = useState('');
+  const [dangerLoading, setDangerLoading] = useState(false);
 
   const fetchMyTracks = () => {
     setLoading(true);
@@ -22,6 +30,44 @@ export default function Profile() {
   useEffect(() => {
     fetchMyTracks();
   }, [statusFilter]);
+
+  const stats = useMemo(() => {
+    const list = Array.isArray(tracks) ? tracks : [];
+    const totalTracks = list.length;
+    const totalPlays = list.reduce((sum, t) => sum + (Number(t.plays) || 0), 0);
+    const totalLikes = list.reduce((sum, t) => {
+      const l = t?.likes;
+      if (typeof l === 'number') return sum + l;
+      if (Array.isArray(l)) return sum + l.length;
+      return sum;
+    }, 0);
+    const byStatus = list.reduce((acc, t) => {
+      const s = t?.status || 'unknown';
+      acc[s] = (acc[s] || 0) + 1;
+      return acc;
+    }, {});
+    const top = [...list].sort((a, b) => (Number(b.plays) || 0) - (Number(a.plays) || 0)).slice(0, 3);
+    return { totalTracks, totalPlays, totalLikes, byStatus, top };
+  }, [tracks]);
+
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+  };
+
+  const handleDeleteAccount = () => {
+    setDangerError('');
+    if (!deletePassword) return setDangerError('Введите пароль');
+    if (deleteConfirm.trim().toLowerCase() !== 'delete') return setDangerError('Введите DELETE для подтверждения');
+    setDangerLoading(true);
+    usersApi.deleteMe(deletePassword)
+      .then(() => {
+        logout();
+        navigate('/');
+      })
+      .catch((e) => setDangerError(e.response?.data?.message || 'Не удалось удалить аккаунт'))
+      .finally(() => setDangerLoading(false));
+  };
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="page profile-page">
@@ -38,12 +84,77 @@ export default function Profile() {
           <option value="rejected">Отклонены</option>
         </select>
         <button type="button" className="neon-btn" onClick={() => setShowUpload(true)}>Загрузить трек</button>
+        <button type="button" className="danger-btn" onClick={() => { setShowDanger(true); setDangerError(''); }}>Удалить аккаунт</button>
+        <button type="button" className="logout-btn" onClick={handleLogout}>Выйти</button>
       </div>
+      <div className="profile-stats">
+        <div className="stat-card">
+          <div className="stat-label">Треков</div>
+          <div className="stat-value">{stats.totalTracks}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Прослушиваний</div>
+          <div className="stat-value">{stats.totalPlays}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Лайков</div>
+          <div className="stat-value">{stats.totalLikes}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Статусы</div>
+          <div className="stat-meta">
+            <span>pending: {stats.byStatus.pending || 0}</span>
+            <span>approved: {stats.byStatus.approved || 0}</span>
+            <span>rejected: {stats.byStatus.rejected || 0}</span>
+          </div>
+        </div>
+      </div>
+      {stats.top.length > 0 && (
+        <div className="profile-top">
+          <h3 className="section-title">Топ по прослушиваниям</h3>
+          <div className="track-grid">
+            {stats.top.map((t) => (
+              <TrackCard key={t._id} track={t} showStatus />
+            ))}
+          </div>
+        </div>
+      )}
       {showUpload && (
         <UploadTrack
           onClose={() => setShowUpload(false)}
           onSuccess={() => { setShowUpload(false); fetchMyTracks(); }}
         />
+      )}
+      {showDanger && (
+        <motion.div className="danger-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} onClick={() => setShowDanger(false)}>
+          <motion.div className="danger-modal" initial={{ scale: 0.96, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} onClick={(e) => e.stopPropagation()}>
+            <h3 className="danger-title">Удалить аккаунт</h3>
+            <p className="danger-text">
+              Это действие необратимо. Для подтверждения введите слово <b>DELETE</b> и ваш пароль.
+            </p>
+            <input
+              type="text"
+              placeholder="Введите DELETE"
+              value={deleteConfirm}
+              onChange={(e) => setDeleteConfirm(e.target.value)}
+              className="danger-input"
+            />
+            <input
+              type="password"
+              placeholder="Пароль"
+              value={deletePassword}
+              onChange={(e) => setDeletePassword(e.target.value)}
+              className="danger-input"
+            />
+            {dangerError && <div className="danger-error">{dangerError}</div>}
+            <div className="danger-actions">
+              <button type="button" className="danger-cancel" onClick={() => setShowDanger(false)}>Отмена</button>
+              <button type="button" disabled={dangerLoading} className="danger-confirm" onClick={handleDeleteAccount}>
+                {dangerLoading ? 'Удаляем...' : 'Удалить'}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
       )}
       {loading ? (
         <div className="loading">Загрузка...</div>
@@ -81,12 +192,99 @@ export default function Profile() {
           font-weight: 600;
         }
         .neon-btn:hover { background: rgba(5, 217, 232, 0.2); }
+        .logout-btn {
+          appearance: none;
+          -webkit-appearance: none;
+          border: 1px solid rgba(255, 42, 109, 0.8);
+          background: rgba(0, 0, 0, 0.25);
+          color: var(--neon-pink);
+          padding: 10px 16px;
+          border-radius: 10px;
+          line-height: 1;
+        }
+        .logout-btn:hover {
+          text-shadow: var(--glow-pink);
+          box-shadow: 0 0 18px rgba(255, 42, 109, 0.25);
+        }
+        .danger-btn {
+          padding: 10px 16px;
+          border: 1px solid rgba(255, 50, 50, 0.7);
+          background: rgba(0,0,0,0.25);
+          color: #ff3232;
+          border-radius: 10px;
+        }
+        .danger-btn:hover { box-shadow: 0 0 18px rgba(255, 50, 50, 0.2); }
+        .profile-stats {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+          gap: 16px;
+          margin-bottom: 28px;
+        }
+        .stat-card {
+          background: var(--bg-card);
+          border: 1px solid rgba(5, 217, 232, 0.2);
+          border-radius: 14px;
+          padding: 14px 16px;
+        }
+        .stat-label { color: var(--text-dim); font-size: 0.85rem; margin-bottom: 6px; }
+        .stat-value { color: var(--neon-cyan); font-family: var(--font-display); font-size: 1.4rem; }
+        .stat-meta { display: flex; flex-direction: column; gap: 6px; color: var(--text); font-size: 0.9rem; }
+        .profile-top { margin-bottom: 24px; }
         .track-grid {
           display: grid;
           grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
           gap: 20px;
         }
         .loading, .empty { text-align: center; padding: 48px; color: var(--text-dim); }
+        .danger-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0,0,0,0.82);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 300;
+          padding: 24px;
+        }
+        .danger-modal {
+          width: 100%;
+          max-width: 420px;
+          background: var(--bg-card);
+          border: 1px solid rgba(255, 50, 50, 0.35);
+          border-radius: 16px;
+          padding: 22px;
+          box-shadow: 0 0 50px rgba(255, 50, 50, 0.12);
+        }
+        .danger-title { color: #ff3232; margin-bottom: 10px; }
+        .danger-text { color: var(--text-dim); margin-bottom: 14px; font-size: 0.95rem; }
+        .danger-input {
+          width: 100%;
+          padding: 10px 14px;
+          margin-bottom: 10px;
+          border: 1px solid rgba(255, 50, 50, 0.35);
+          border-radius: 10px;
+          background: rgba(0,0,0,0.25);
+          color: var(--text);
+        }
+        .danger-error { color: #ff6b6b; margin-top: 6px; margin-bottom: 10px; font-size: 0.9rem; }
+        .danger-actions { display: flex; gap: 10px; margin-top: 14px; }
+        .danger-cancel {
+          flex: 1;
+          padding: 10px 14px;
+          border: 1px solid var(--text-dim);
+          background: transparent;
+          color: var(--text-dim);
+          border-radius: 10px;
+        }
+        .danger-confirm {
+          flex: 1;
+          padding: 10px 14px;
+          border: 1px solid rgba(255, 50, 50, 0.75);
+          background: rgba(255, 50, 50, 0.18);
+          color: #ff3232;
+          border-radius: 10px;
+          font-weight: 700;
+        }
         @media (max-width: 900px) {
           .profile-page { padding-left: 0; padding-right: 0; }
         }
