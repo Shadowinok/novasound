@@ -32,17 +32,6 @@ export default function Home() {
           </div>
         </section>
       )}
-      <section>
-        <h3 className="section-title">Последние треки</h3>
-        <div className="track-grid">
-          {latest.map((t) => (
-            <TrackCard key={t._id} track={t} />
-          ))}
-        </div>
-        <div className="section-more">
-          <Link to="/catalog" className="neon-btn">Весь каталог</Link>
-        </div>
-      </section>
       {playlistList.length > 0 && (
         <section>
           <h3 className="section-title">Плейлисты</h3>
@@ -62,6 +51,17 @@ export default function Home() {
           </div>
         </section>
       )}
+      <section>
+        <h3 className="section-title">Последние треки</h3>
+        <div className="track-grid">
+          {latest.map((t) => (
+            <TrackCard key={t._id} track={t} />
+          ))}
+        </div>
+        <div className="section-more">
+          <Link to="/catalog" className="neon-btn">Весь каталог</Link>
+        </div>
+      </section>
       <style>{`
         .page { padding: 0 8px; }
         .hero {
