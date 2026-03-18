@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import client, { users as usersApi } from '../api/client';
+import client, { tracks as tracksApi, users as usersApi } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import TrackCard from '../components/TrackCard';
 import UploadTrack from '../components/UploadTrack';
@@ -18,6 +18,8 @@ export default function Profile() {
   const [deleteConfirm, setDeleteConfirm] = useState('');
   const [dangerError, setDangerError] = useState('');
   const [dangerLoading, setDangerLoading] = useState(false);
+  const [deleteTrackId, setDeleteTrackId] = useState('');
+  const [deleteTrackLoading, setDeleteTrackLoading] = useState(false);
 
   const fetchMyTracks = () => {
     setLoading(true);
@@ -67,6 +69,19 @@ export default function Profile() {
       })
       .catch((e) => setDangerError(e.response?.data?.message || 'Не удалось удалить аккаунт'))
       .finally(() => setDangerLoading(false));
+  };
+
+  const handleDeleteTrack = (id) => {
+    if (!id) return;
+    setDeleteTrackId(id);
+    setDeleteTrackLoading(true);
+    tracksApi.delete(id)
+      .then(() => fetchMyTracks())
+      .catch(() => {})
+      .finally(() => {
+        setDeleteTrackLoading(false);
+        setDeleteTrackId('');
+      });
   };
 
   return (
@@ -163,7 +178,22 @@ export default function Profile() {
       ) : (
         <div className="track-grid">
           {tracks.map((t) => (
-            <TrackCard key={t._id} track={t} showStatus />
+            <div key={t._id} className="my-track">
+              <TrackCard track={t} showStatus />
+              <div className="my-track-actions">
+                <button
+                  type="button"
+                  className="my-track-delete"
+                  disabled={deleteTrackLoading && deleteTrackId === t._id}
+                  onClick={() => {
+                    // eslint-disable-next-line no-alert
+                    if (window.confirm('Удалить трек? Это действие необратимо.')) handleDeleteTrack(t._id);
+                  }}
+                >
+                  {deleteTrackLoading && deleteTrackId === t._id ? 'Удаляем...' : 'Удалить'}
+                </button>
+              </div>
+            </div>
           ))}
         </div>
       )}
@@ -235,6 +265,17 @@ export default function Profile() {
           grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
           gap: 20px;
         }
+        .my-track { display: flex; flex-direction: column; gap: 10px; }
+        .my-track-actions { display: flex; justify-content: flex-end; }
+        .my-track-delete {
+          padding: 8px 12px;
+          border: 1px solid rgba(255, 50, 50, 0.7);
+          background: rgba(0,0,0,0.25);
+          color: #ff3232;
+          border-radius: 10px;
+          font-weight: 700;
+        }
+        .my-track-delete:disabled { opacity: 0.6; cursor: not-allowed; }
         .loading, .empty { text-align: center; padding: 48px; color: var(--text-dim); }
         .danger-overlay {
           position: fixed;
