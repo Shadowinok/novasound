@@ -51,7 +51,7 @@ export default function Home() {
           </div>
         </section>
       )}
-      <section>
+      <section className="latest-section">
         <h3 className="section-title">Последние треки</h3>
         <div className="track-grid">
           {latest.map((t) => (
@@ -64,6 +64,7 @@ export default function Home() {
       </section>
       <style>{`
         .page { padding: 0 8px; }
+        .latest-section { margin-top: 56px; }
         .hero {
           text-align: center;
           padding: 48px 24px;
