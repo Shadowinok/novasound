@@ -8,19 +8,25 @@ export default function Register() {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [acceptTerms, setAcceptTerms] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = (e) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
+    if (!acceptTerms) {
+      setError('Нужно принять правила сервиса');
+      return;
+    }
     setLoading(true);
-    auth.register({ username, email, password })
+    auth.register({ username, email, password, acceptTerms: true })
       .then((r) => {
-        login(r.data.token, r.data.user);
-        navigate('/');
+        setSuccess(r.data?.message || 'Письмо с подтверждением отправлено. Проверьте почту.');
+        setTimeout(() => navigate('/login'), 1200);
       })
       .catch((err) => setError(err.response?.data?.message || 'Ошибка регистрации'))
       .finally(() => setLoading(false));
@@ -57,7 +63,21 @@ export default function Register() {
             minLength={6}
             className="auth-input"
           />
+          <label className="auth-terms">
+            <input
+              type="checkbox"
+              checked={acceptTerms}
+              onChange={(e) => setAcceptTerms(e.target.checked)}
+            />
+            <span>
+              Я принимаю{' '}
+              <a href="/terms" target="_blank" rel="noreferrer">
+                правила сервиса
+              </a>
+            </span>
+          </label>
           {error && <div className="auth-error">{error}</div>}
+          {success && <div className="auth-success">{success}</div>}
           <button type="submit" disabled={loading} className="auth-submit">Зарегистрироваться</button>
         </form>
         <p className="auth-footer">Уже есть аккаунт? <Link to="/login">Вход</Link></p>
@@ -84,6 +104,7 @@ export default function Register() {
           color: var(--text);
         }
         .auth-error { color: #ff6b6b; margin-bottom: 12px; font-size: 0.9rem; }
+        .auth-success { color: #00ff64; margin-bottom: 12px; font-size: 0.9rem; }
         .auth-submit {
           width: 100%;
           padding: 14px;
@@ -93,6 +114,15 @@ export default function Register() {
           border-radius: 8px;
           font-weight: 600;
         }
+        .auth-terms {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 0.85rem;
+          color: var(--text-dim);
+          margin-bottom: 12px;
+        }
+        .auth-terms a { color: var(--neon-cyan); }
         .auth-footer { margin-top: 20px; text-align: center; color: var(--text-dim); }
       `}</style>
     </motion.div>
