@@ -9,6 +9,7 @@ export default function UploadTrack({ onClose, onSuccess }) {
   const [coverFile, setCoverFile] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -22,12 +23,13 @@ export default function UploadTrack({ onClose, onSuccess }) {
     }
     setError('');
     setLoading(true);
+    setProgress(0);
     const formData = new FormData();
     formData.append('title', title);
     formData.append('description', description);
     formData.append('audio', audioFile);
     if (coverFile) formData.append('cover', coverFile);
-    tracksApi.create(formData)
+    tracksApi.createWithProgress(formData, ({ pct }) => setProgress(pct))
       .then(() => onSuccess())
       .catch((err) => setError(err.response?.data?.message || 'Ошибка загрузки'))
       .finally(() => setLoading(false));
@@ -80,6 +82,12 @@ export default function UploadTrack({ onClose, onSuccess }) {
             className="upload-file"
           />
           {error && <div className="upload-error">{error}</div>}
+          {loading && (
+            <div className="upload-progress">
+              <div className="upload-progress-bar" style={{ width: `${progress}%` }} />
+              <div className="upload-progress-text">{progress}%</div>
+            </div>
+          )}
           <div className="upload-actions">
             <button type="button" className="upload-cancel" onClick={onClose}>Отмена</button>
             <button type="submit" disabled={loading} className="upload-submit">Загрузить</button>
@@ -118,6 +126,27 @@ export default function UploadTrack({ onClose, onSuccess }) {
         }
         .upload-label { display: block; margin-bottom: 4px; font-size: 0.9rem; color: var(--text-dim); }
         .upload-error { color: #ff6b6b; margin-bottom: 12px; font-size: 0.9rem; }
+        .upload-progress {
+          position: relative;
+          height: 10px;
+          border-radius: 999px;
+          background: rgba(255,255,255,0.08);
+          border: 1px solid rgba(5, 217, 232, 0.25);
+          overflow: hidden;
+          margin: 10px 0 6px;
+        }
+        .upload-progress-bar {
+          height: 100%;
+          background: linear-gradient(90deg, var(--neon-cyan), var(--neon-pink));
+          box-shadow: 0 0 18px rgba(5, 217, 232, 0.25);
+          transition: width 0.15s linear;
+        }
+        .upload-progress-text {
+          margin-bottom: 10px;
+          font-size: 0.85rem;
+          color: var(--text-dim);
+          text-align: right;
+        }
         .upload-actions { display: flex; gap: 12px; margin-top: 20px; }
         .upload-cancel {
           padding: 10px 20px;
