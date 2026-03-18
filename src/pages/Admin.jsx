@@ -94,7 +94,7 @@ export default function Admin() {
         .admin-page {
           max-width: 1100px;
           margin: 0 auto;
-          padding-left: 200px;
+          padding-left: 280px;
           padding-right: 24px;
         }
         .admin-tabs { display: flex; gap: 8px; margin-bottom: 20px; }
