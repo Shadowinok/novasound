@@ -58,6 +58,12 @@ export default function Profile() {
       )}
       <style>{`
         .page-title { color: var(--neon-cyan); margin-bottom: 24px; }
+        .profile-page {
+          max-width: 1100px;
+          margin: 0 auto;
+          padding-left: 280px;
+          padding-right: 24px;
+        }
         .profile-toolbar { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
         .profile-select {
           padding: 10px 16px;
@@ -81,6 +87,9 @@ export default function Profile() {
           gap: 20px;
         }
         .loading, .empty { text-align: center; padding: 48px; color: var(--text-dim); }
+        @media (max-width: 900px) {
+          .profile-page { padding-left: 0; padding-right: 0; }
+        }
       `}</style>
     </motion.div>
   );
