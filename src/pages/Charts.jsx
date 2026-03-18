@@ -51,6 +51,12 @@ export default function Charts() {
       )}
       <style>{`
         .page-title { color: var(--neon-cyan); margin-bottom: 24px; }
+        .charts-page {
+          max-width: 1100px;
+          margin: 0 auto;
+          padding-left: 280px;
+          padding-right: 24px;
+        }
         .charts-tabs { display: flex; gap: 8px; margin-bottom: 24px; }
         .chart-tab {
           padding: 10px 20px;
@@ -78,6 +84,9 @@ export default function Charts() {
         }
         .chart-row .track-card { flex: 1; }
         .loading, .empty { text-align: center; padding: 48px; color: var(--text-dim); }
+        @media (max-width: 900px) {
+          .charts-page { padding-left: 0; padding-right: 0; }
+        }
       `}</style>
     </motion.div>
   );
