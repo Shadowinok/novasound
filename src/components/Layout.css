@@ -46,6 +46,28 @@
   text-shadow: var(--glow-cyan);
 }
 
+.logout-btn {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid rgba(255, 42, 109, 0.8);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--neon-pink);
+  padding: 8px 12px;
+  border-radius: 10px;
+  line-height: 1;
+}
+.logout-btn:hover {
+  text-shadow: var(--glow-pink);
+  box-shadow: 0 0 18px rgba(255, 42, 109, 0.25);
+}
+.logout-btn:focus {
+  outline: none;
+}
+.logout-btn:focus-visible {
+  outline: 2px solid rgba(255, 42, 109, 0.45);
+  outline-offset: 2px;
+}
+
 .user-name {
   color: var(--text-dim);
   font-size: 0.95rem;
