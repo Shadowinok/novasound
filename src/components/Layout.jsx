@@ -7,7 +7,7 @@ import PlayerBar from './PlayerBar';
 import './Layout.css';
 
 export default function Layout() {
-  const { user, isAdmin, logout } = useAuth();
+  const { user, isAdmin } = useAuth();
 
   return (
     <div className="layout">
@@ -16,10 +16,7 @@ export default function Layout() {
         <div className="header-inner">
           <div className="auth-links">
             {user ? (
-              <>
-                <span className="user-name">{user.username}</span>
-                <button type="button" className="nav-link logout-btn" onClick={logout}>Выйти</button>
-              </>
+              <span className="user-name">{user.username}</span>
             ) : (
               <>
                 <a href="/login" className="nav-link">Вход</a>
