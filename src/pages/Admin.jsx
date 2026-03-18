@@ -50,7 +50,7 @@ export default function Admin() {
       </div>
       {tab === 'moderation' && (
         <>
-          <p className="admin-hint">Одобрьте или отклоните треки. Можно добавить комментарий.</p>
+          <p className="admin-hint">Одобрите или отклоните треки. Можно добавить комментарий.</p>
           <input
             type="text"
             placeholder="Комментарий модератора (опционально)"
@@ -91,6 +91,12 @@ export default function Admin() {
       )}
       <style>{`
         .page-title { color: var(--neon-cyan); margin-bottom: 24px; }
+        .admin-page {
+          max-width: 1100px;
+          margin: 0 auto;
+          padding-left: 200px;
+          padding-right: 24px;
+        }
         .admin-tabs { display: flex; gap: 8px; margin-bottom: 20px; }
         .admin-tabs button {
           padding: 10px 20px;
@@ -139,6 +145,9 @@ export default function Admin() {
         .admin-playlists .playlist-list { list-style: none; }
         .playlist-link { color: var(--neon-cyan); }
         .loading, .empty { padding: 24px; color: var(--text-dim); }
+        @media (max-width: 900px) {
+          .admin-page { padding-left: 0; padding-right: 0; }
+        }
       `}</style>
     </motion.div>
   );
