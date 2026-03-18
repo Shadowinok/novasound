@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import ParticleBackground from './ParticleBackground';
@@ -8,6 +8,20 @@ import './Layout.css';
 
 export default function Layout() {
   const { user, isAdmin } = useAuth();
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const mskTime = useMemo(() => {
+    try {
+      return new Intl.DateTimeFormat('ru-RU', { timeZone: 'Europe/Moscow', hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date(now));
+    } catch {
+      return new Date(now).toLocaleTimeString('ru-RU');
+    }
+  }, [now]);
 
   return (
     <div className="layout">
@@ -16,7 +30,10 @@ export default function Layout() {
         <div className="header-inner">
           <div className="auth-links">
             {user ? (
-              <span className="user-name">{user.username}</span>
+              <div className="user-box">
+                <span className="user-name">{user.username}</span>
+                <span className="msk-clock">MSK {mskTime}</span>
+              </div>
             ) : (
               <>
                 <a href="/login" className="nav-link">Вход</a>

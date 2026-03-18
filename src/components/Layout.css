@@ -37,6 +37,19 @@
   align-items: center;
 }
 
+.user-box {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.msk-clock {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  letter-spacing: 0.06em;
+}
+
 .nav-link {
   color: var(--neon-cyan);
   font-weight: 500;
