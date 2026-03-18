@@ -33,6 +33,10 @@ export const auth = {
   me: () => client.get('/auth/me')
 };
 
+export const users = {
+  deleteMe: (password) => client.delete('/users/me', { data: { password } })
+};
+
 export const tracks = {
   list: (params) => client.get('/tracks', { params }),
   get: (id) => client.get(`/tracks/${id}`),
