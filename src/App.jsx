@@ -9,8 +9,10 @@ import Playlists from './pages/Playlists';
 import PlaylistPage from './pages/PlaylistPage';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import VerifyEmail from './pages/VerifyEmail';
 import Profile from './pages/Profile';
 import Admin from './pages/Admin';
+import Terms from './pages/Terms';
 
 function PrivateRoute({ children, admin }) {
   const token = localStorage.getItem('novasound_token');
@@ -32,6 +34,8 @@ export default function App() {
         <Route path="playlist/:id" element={<PlaylistPage />} />
         <Route path="login" element={<Login />} />
         <Route path="register" element={<Register />} />
+        <Route path="verify-email" element={<VerifyEmail />} />
+        <Route path="terms" element={<Terms />} />
         <Route path="profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
         <Route path="admin" element={<PrivateRoute admin><Admin /></PrivateRoute>} />
       </Route>
