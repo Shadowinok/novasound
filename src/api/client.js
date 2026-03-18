@@ -42,6 +42,16 @@ export const tracks = {
   get: (id) => client.get(`/tracks/${id}`),
   my: (params) => client.get('/tracks/my', { params }),
   create: (formData) => client.post('/tracks', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  createWithProgress: (formData, onProgress) => client.post('/tracks', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    onUploadProgress: (evt) => {
+      if (!onProgress) return;
+      const total = evt.total || 0;
+      const loaded = evt.loaded || 0;
+      const pct = total ? Math.round((loaded / total) * 100) : 0;
+      onProgress({ loaded, total, pct });
+    }
+  }),
   update: (id, data) => client.put(`/tracks/${id}`, data),
   delete: (id) => client.delete(`/tracks/${id}`),
   play: (id) => client.post(`/tracks/${id}/play`),
