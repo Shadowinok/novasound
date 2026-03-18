@@ -14,9 +14,6 @@ export default function Layout() {
       <ParticleBackground />
       <header className="header">
         <div className="header-inner">
-          <h1 className="site-title">
-            <span className="neon-pink">Nova</span><span className="neon-cyan">Sound</span>
-          </h1>
           <div className="auth-links">
             {user ? (
               <span className="user-name">{user.username}</span>
@@ -27,6 +24,9 @@ export default function Layout() {
               </>
             )}
           </div>
+          <h1 className="site-title">
+            <span className="neon-pink">Nova</span><span className="neon-cyan">Sound</span>
+          </h1>
         </div>
       </header>
       <main className="main">
