@@ -57,6 +57,12 @@ export default function Catalog() {
       )}
       <style>{`
         .page-title { color: var(--neon-cyan); margin-bottom: 24px; font-size: 1.5rem; }
+        .catalog {
+          max-width: 1100px;
+          margin: 0 auto;
+          padding-left: 280px;
+          padding-right: 24px;
+        }
         .catalog-toolbar { margin-bottom: 24px; }
         .search-input {
           width: 100%;
@@ -98,6 +104,9 @@ export default function Catalog() {
         }
         .pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
         .pagination button:not(:disabled):hover { background: rgba(5, 217, 232, 0.2); }
+        @media (max-width: 900px) {
+          .catalog { padding-left: 0; padding-right: 0; }
+        }
       `}</style>
     </motion.div>
   );
