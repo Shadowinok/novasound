@@ -8,8 +8,12 @@ import TrackCard from '../components/TrackCard';
 export default function Admin() {
   const [pending, setPending] = useState([]);
   const [playlists, setPlaylists] = useState([]);
+  const [users, setUsers] = useState([]);
   const [tab, setTab] = useState('moderation');
   const [comment, setComment] = useState('');
+  const [userReason, setUserReason] = useState('Нарушение правил сервиса');
+  const [deletingUserId, setDeletingUserId] = useState('');
+  const [adminMessage, setAdminMessage] = useState('');
   const [loading, setLoading] = useState(true);
 
   const fetchPending = () => {
@@ -18,13 +22,18 @@ export default function Admin() {
   const fetchPlaylists = () => {
     client.get('/playlists').then((r) => setPlaylists(r.data || [])).catch(() => setPlaylists([]));
   };
+  const fetchUsers = () => {
+    adminApi.users().then((r) => setUsers(r.data || [])).catch(() => setUsers([]));
+  };
 
   useEffect(() => {
     setLoading(true);
     if (tab === 'moderation') {
       adminApi.pendingTracks().then((r) => setPending(r.data || [])).catch(() => setPending([])).finally(() => setLoading(false));
-    } else {
+    } else if (tab === 'playlists') {
       client.get('/playlists').then((r) => setPlaylists(r.data || [])).catch(() => setPlaylists([])).finally(() => setLoading(false));
+    } else {
+      adminApi.users().then((r) => setUsers(r.data || [])).catch(() => setUsers([])).finally(() => setLoading(false));
     }
   }, [tab]);
 
@@ -40,6 +49,20 @@ export default function Admin() {
       fetchPending();
     }).catch(() => {});
   };
+  const handleDeleteUser = (id) => {
+    if (!id) return;
+    // eslint-disable-next-line no-alert
+    if (!window.confirm('Удалить аккаунт пользователя без возможности восстановления?')) return;
+    setDeletingUserId(id);
+    setAdminMessage('');
+    adminApi.deleteUser(id, userReason)
+      .then((r) => {
+        setAdminMessage(r.data?.message || 'Пользователь удалён');
+        fetchUsers();
+      })
+      .catch((e) => setAdminMessage(e.response?.data?.message || 'Ошибка удаления пользователя'))
+      .finally(() => setDeletingUserId(''));
+  };
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="page admin-page">
@@ -47,6 +70,7 @@ export default function Admin() {
       <div className="admin-tabs">
         <button type="button" className={tab === 'moderation' ? 'active' : ''} onClick={() => setTab('moderation')}>Модерация треков</button>
         <button type="button" className={tab === 'playlists' ? 'active' : ''} onClick={() => setTab('playlists')}>Плейлисты</button>
+        <button type="button" className={tab === 'users' ? 'active' : ''} onClick={() => setTab('users')}>Пользователи</button>
       </div>
       {tab === 'moderation' && (
         <>
@@ -87,6 +111,60 @@ export default function Admin() {
               </li>
             ))}
           </ul>
+        </div>
+      )}
+      {tab === 'users' && (
+        <div className="admin-users">
+          <p className="admin-hint">Удаление аккаунтов пользователей администратором.</p>
+          <input
+            type="text"
+            value={userReason}
+            onChange={(e) => setUserReason(e.target.value)}
+            className="admin-comment-input"
+            placeholder="Причина удаления (уйдёт в письмо пользователю)"
+          />
+          {adminMessage && <div className="admin-message">{adminMessage}</div>}
+          {loading ? (
+            <div className="loading">Загрузка...</div>
+          ) : users.length === 0 ? (
+            <div className="empty">Пользователей пока нет</div>
+          ) : (
+            <div className="users-table-wrap">
+              <table className="users-table">
+                <thead>
+                  <tr>
+                    <th>Пользователь</th>
+                    <th>Email</th>
+                    <th>Роль</th>
+                    <th>Статус</th>
+                    <th>Создан</th>
+                    <th>Действие</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map((u) => (
+                    <tr key={u._id}>
+                      <td>{u.username}</td>
+                      <td>{u.email}</td>
+                      <td>{u.role}</td>
+                      <td>{u.isBlocked ? 'Заблокирован' : 'Активен'}</td>
+                      <td>{u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '-'}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="admin-btn reject"
+                          disabled={deletingUserId === u._id}
+                          onClick={() => handleDeleteUser(u._id)}
+                        >
+                          {deletingUserId === u._id ? 'Удаляем...' : 'Удалить'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
       <style>{`
@@ -144,6 +222,32 @@ export default function Admin() {
         .admin-btn.reject { background: rgba(255, 50, 50, 0.3); color: #ff3232; }
         .admin-playlists .playlist-list { list-style: none; }
         .playlist-link { color: var(--neon-cyan); }
+        .admin-message {
+          margin-bottom: 12px;
+          color: var(--neon-cyan);
+          font-size: 0.9rem;
+        }
+        .users-table-wrap {
+          overflow-x: auto;
+          border: 1px solid rgba(5, 217, 232, 0.2);
+          border-radius: 10px;
+        }
+        .users-table {
+          width: 100%;
+          border-collapse: collapse;
+          min-width: 760px;
+        }
+        .users-table th,
+        .users-table td {
+          padding: 10px 12px;
+          border-bottom: 1px solid rgba(5, 217, 232, 0.12);
+          text-align: left;
+          font-size: 0.9rem;
+        }
+        .users-table th {
+          color: var(--neon-cyan);
+          font-weight: 600;
+        }
         .loading, .empty { padding: 24px; color: var(--text-dim); }
         @media (max-width: 900px) {
           .admin-page { padding-left: 0; padding-right: 0; }
