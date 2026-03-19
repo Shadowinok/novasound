@@ -16,7 +16,7 @@ client.interceptors.request.use((config) => {
 client.interceptors.response.use(
   (r) => r,
   (err) => {
-    if (err.response?.status === 401) {
+    if (err.response?.status === 401 || err.response?.status === 403) {
       localStorage.removeItem('novasound_token');
       localStorage.removeItem('novasound_user');
       window.dispatchEvent(new Event('auth_logout'));
@@ -76,6 +76,8 @@ export const playlists = {
 };
 
 export const admin = {
+  users: () => client.get('/admin/users'),
+  deleteUser: (id, reason) => client.delete(`/admin/users/${id}`, { data: { reason } }),
   pendingTracks: () => client.get('/admin/tracks/pending'),
   approveTrack: (id, comment) => client.put(`/admin/tracks/${id}/approve`, { comment }),
   rejectTrack: (id, comment) => client.put(`/admin/tracks/${id}/reject`, { comment })
