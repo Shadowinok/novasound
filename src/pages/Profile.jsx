@@ -20,6 +20,7 @@ export default function Profile() {
   const [dangerLoading, setDangerLoading] = useState(false);
   const [deleteTrackId, setDeleteTrackId] = useState('');
   const [deleteTrackLoading, setDeleteTrackLoading] = useState(false);
+  const [reports, setReports] = useState([]);
 
   const fetchMyTracks = () => {
     setLoading(true);
@@ -29,8 +30,15 @@ export default function Profile() {
       .finally(() => setLoading(false));
   };
 
+  const fetchMyReports = () => {
+    tracksApi.myReports()
+      .then((r) => setReports(r.data || []))
+      .catch(() => setReports([]));
+  };
+
   useEffect(() => {
     fetchMyTracks();
+    fetchMyReports();
   }, [statusFilter]);
 
   const stats = useMemo(() => {
@@ -134,6 +142,25 @@ export default function Profile() {
           </div>
         </div>
       )}
+      <div className="profile-reports">
+        <h3 className="section-title">Мои жалобы</h3>
+        {reports.length === 0 ? (
+          <div className="empty">Жалоб пока нет</div>
+        ) : (
+          <div className="reports-list">
+            {reports.map((r) => (
+              <div key={r._id} className="report-item">
+                <div className="report-head">
+                  <b>{r.track?.title || 'Удалённый трек'}</b>
+                  <span className={`report-status status-${r.status}`}>{r.status === 'open' ? 'Открыта' : 'Обработана'}</span>
+                </div>
+                <div className="report-body">{r.text}</div>
+                {r.moderationComment && <div className="report-admin-comment">Ответ модератора: {r.moderationComment}</div>}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
       {showUpload && (
         <UploadTrack
           onClose={() => setShowUpload(false)}
@@ -258,6 +285,30 @@ export default function Profile() {
         }
         .stat-label { color: var(--text-dim); font-size: 0.85rem; margin-bottom: 6px; }
         .stat-value { color: var(--neon-cyan); font-family: var(--font-display); font-size: 1.4rem; }
+        .profile-reports { margin: 26px 0; }
+        .reports-list { display: flex; flex-direction: column; gap: 12px; }
+        .report-item {
+          border: 1px solid rgba(5, 217, 232, 0.2);
+          background: rgba(0,0,0,0.22);
+          border-radius: 12px;
+          padding: 12px;
+        }
+        .report-head {
+          display: flex;
+          justify-content: space-between;
+          gap: 12px;
+          margin-bottom: 6px;
+        }
+        .report-status {
+          font-size: 0.8rem;
+          border-radius: 999px;
+          padding: 2px 8px;
+          border: 1px solid rgba(5, 217, 232, 0.35);
+        }
+        .report-status.status-open { color: #ffc800; border-color: rgba(255, 200, 0, 0.4); }
+        .report-status.status-resolved { color: #00ff64; border-color: rgba(0, 255, 100, 0.35); }
+        .report-body { color: var(--text); margin-bottom: 6px; }
+        .report-admin-comment { color: var(--neon-cyan); font-size: 0.9rem; }
         .stat-meta { display: flex; flex-direction: column; gap: 6px; color: var(--text); font-size: 0.9rem; }
         .profile-top { margin-bottom: 24px; }
         .track-grid {

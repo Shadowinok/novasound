@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import client from '../api/client';
 import { usePlayer } from '../context/PlayerContext';
 import { useAuth } from '../context/AuthContext';
+import { playlists as playlistsApi } from '../api/client';
 
 export default function TrackPage() {
   const { id } = useParams();
@@ -11,10 +12,15 @@ export default function TrackPage() {
   const [track, setTrack] = useState(null);
   const [loading, setLoading] = useState(true);
   const [liked, setLiked] = useState(false);
+  const [disliked, setDisliked] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [reportText, setReportText] = useState('');
   const [reportError, setReportError] = useState('');
   const [reportLoading, setReportLoading] = useState(false);
+  const [showPlaylistModal, setShowPlaylistModal] = useState(false);
+  const [myPlaylists, setMyPlaylists] = useState([]);
+  const [newPlaylistTitle, setNewPlaylistTitle] = useState('');
+  const [playlistMessage, setPlaylistMessage] = useState('');
   const { loadTrack, currentTrack, playing, togglePlay } = usePlayer();
   const { user } = useAuth();
 
@@ -23,6 +29,7 @@ export default function TrackPage() {
       .then((r) => {
         setTrack(r.data);
         setLiked(Array.isArray(r.data.likes) && user && r.data.likes.some(l => l.toString?.() === user.id || l === user.id));
+        setDisliked(Array.isArray(r.data.dislikes) && user && r.data.dislikes.some(l => l.toString?.() === user.id || l === user.id));
       })
       .catch(() => navigate('/'))
       .finally(() => setLoading(false));
@@ -40,7 +47,22 @@ export default function TrackPage() {
     client.post(`/tracks/${id}/like`)
       .then((r) => {
         setLiked(r.data.liked);
+        setDisliked(r.data.disliked);
         setTrack((prev) => prev ? { ...prev, likes: r.data.likes } : null);
+      })
+      .catch(() => {});
+  };
+
+  const handleDislike = () => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    client.post(`/tracks/${id}/dislike`)
+      .then((r) => {
+        setLiked(r.data.liked);
+        setDisliked(r.data.disliked);
+        setTrack((prev) => prev ? { ...prev, likes: r.data.likes, dislikes: r.data.dislikes } : null);
       })
       .catch(() => {});
   };
@@ -65,6 +87,32 @@ export default function TrackPage() {
         setReportError(e.response?.data?.message || 'Не удалось отправить жалобу');
       })
       .finally(() => setReportLoading(false));
+  };
+
+  const openPlaylistModal = () => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    setPlaylistMessage('');
+    setShowPlaylistModal(true);
+    playlistsApi.myList().then((r) => setMyPlaylists(r.data || [])).catch(() => setMyPlaylists([]));
+  };
+
+  const handleCreatePlaylist = () => {
+    if (!newPlaylistTitle.trim()) return;
+    playlistsApi.createMy({ title: newPlaylistTitle.trim() })
+      .then((r) => {
+        setMyPlaylists((prev) => [r.data, ...prev]);
+        setNewPlaylistTitle('');
+      })
+      .catch((e) => setPlaylistMessage(e.response?.data?.message || 'Не удалось создать плейлист'));
+  };
+
+  const handleAddToPlaylist = (playlistId) => {
+    playlistsApi.addTrack(playlistId, id)
+      .then((r) => setPlaylistMessage(r.data?.message || 'Добавлено'))
+      .catch((e) => setPlaylistMessage(e.response?.data?.message || 'Не удалось добавить трек'));
   };
 
   if (loading || !track) {
@@ -92,6 +140,10 @@ export default function TrackPage() {
             <button type="button" className={`like-btn ${liked ? 'liked' : ''}`} onClick={handleLike}>
               ♥ {typeof track.likes === 'number' ? track.likes : (track.likes?.length ?? 0)}
             </button>
+            <button type="button" className={`dislike-btn ${disliked ? 'active' : ''}`} onClick={handleDislike}>
+              👎 {typeof track.dislikes === 'number' ? track.dislikes : (track.dislikes?.length ?? 0)}
+            </button>
+            <button type="button" className="playlist-btn" onClick={openPlaylistModal}>В плейлист</button>
             <button type="button" className="report-btn" onClick={() => setShowReport(true)}>
               Пожаловаться
             </button>
@@ -139,6 +191,22 @@ export default function TrackPage() {
           border-radius: 6px;
         }
         .like-btn.liked { background: rgba(255, 42, 109, 0.3); }
+        .dislike-btn {
+          border: 1px solid rgba(5, 217, 232, 0.5);
+          background: transparent;
+          color: var(--neon-cyan);
+          padding: 6px 12px;
+          border-radius: 6px;
+        }
+        .dislike-btn.active { background: rgba(5, 217, 232, 0.2); }
+        .playlist-btn {
+          border: 1px solid rgba(120, 120, 255, 0.6);
+          background: transparent;
+          color: #b9b9ff;
+          padding: 6px 12px;
+          border-radius: 6px;
+        }
+        .playlist-btn:hover { background: rgba(120, 120, 255, 0.12); }
         .report-btn {
           border: 1px solid rgba(255, 200, 0, 0.6);
           background: transparent;
@@ -223,6 +291,37 @@ export default function TrackPage() {
               font-weight: 600;
             }
           `}</style>
+        </div>
+      )}
+
+      {showPlaylistModal && (
+        <div className="report-overlay" onClick={() => setShowPlaylistModal(false)}>
+          <div className="report-modal" onClick={(e) => e.stopPropagation()}>
+            <h3 className="report-title">Добавить в плейлист</h3>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+              <input
+                className="report-textarea"
+                style={{ minHeight: 44 }}
+                placeholder="Новый плейлист"
+                value={newPlaylistTitle}
+                onChange={(e) => setNewPlaylistTitle(e.target.value)}
+              />
+              <button type="button" className="report-submit" onClick={handleCreatePlaylist}>Создать</button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 260, overflow: 'auto' }}>
+              {myPlaylists.map((p) => (
+                <div key={p._id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+                  <span>{p.title}</span>
+                  <button type="button" className="report-submit" onClick={() => handleAddToPlaylist(p._id)}>Добавить</button>
+                </div>
+              ))}
+              {myPlaylists.length === 0 && <div className="report-error">Плейлистов пока нет</div>}
+            </div>
+            {playlistMessage && <div className="report-error" style={{ color: '#00ff64' }}>{playlistMessage}</div>}
+            <div className="report-actions">
+              <button type="button" className="report-cancel" onClick={() => setShowPlaylistModal(false)}>Закрыть</button>
+            </div>
+          </div>
         </div>
       )}
     </motion.div>
