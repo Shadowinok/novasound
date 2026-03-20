@@ -89,10 +89,10 @@ export default function TrackCard({ track, showStatus }) {
       return;
     }
     client.post(`/tracks/${track._id}/report`, { text: reportText.trim() })
-      .then(() => {
+      .then((r) => {
         setShowReport(false);
         setReportText('');
-        setActionMessage('Жалоба отправлена');
+        setActionMessage(r.data?.message || 'Жалоба отправлена');
       })
       .catch((e) => setActionMessage(e.response?.data?.message || 'Не удалось отправить жалобу'));
   };
