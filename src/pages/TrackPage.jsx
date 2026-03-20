@@ -16,6 +16,7 @@ export default function TrackPage() {
   const [showReport, setShowReport] = useState(false);
   const [reportText, setReportText] = useState('');
   const [reportError, setReportError] = useState('');
+  const [reportSuccess, setReportSuccess] = useState('');
   const [reportLoading, setReportLoading] = useState(false);
   const [showPlaylistModal, setShowPlaylistModal] = useState(false);
   const [myPlaylists, setMyPlaylists] = useState([]);
@@ -73,14 +74,15 @@ export default function TrackPage() {
       return;
     }
     setReportError('');
+    setReportSuccess('');
     if (!reportText.trim() || reportText.trim().length < 10) {
       setReportError('Опишите жалобу (минимум 10 символов)');
       return;
     }
     setReportLoading(true);
     client.post(`/tracks/${id}/report`, { text: reportText.trim() })
-      .then(() => {
-        setShowReport(false);
+      .then((r) => {
+        setReportSuccess(r.data?.message || 'Жалоба отправлена');
         setReportText('');
       })
       .catch((e) => {
@@ -233,6 +235,7 @@ export default function TrackPage() {
               className="report-textarea"
               placeholder="Опишите проблему. Чем подробнее — тем быстрее админ/ИИ разберётся."
             />
+            {reportSuccess && <div className="report-success">{reportSuccess}</div>}
             {reportError && <div className="report-error">{reportError}</div>}
             <div className="report-actions">
               <button type="button" className="report-cancel" onClick={() => setShowReport(false)} disabled={reportLoading}>
@@ -274,6 +277,7 @@ export default function TrackPage() {
               margin-bottom: 12px;
             }
             .report-error { color: #ff6b6b; margin-bottom: 12px; font-size: 0.9rem; }
+            .report-success { color: #00ff64; margin-bottom: 12px; font-size: 0.9rem; }
             .report-actions { display: flex; gap: 12px; justify-content: flex-end; }
             .report-cancel {
               padding: 10px 16px;
