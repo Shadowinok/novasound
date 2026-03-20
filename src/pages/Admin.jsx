@@ -9,11 +9,15 @@ export default function Admin() {
   const [pending, setPending] = useState([]);
   const [playlists, setPlaylists] = useState([]);
   const [users, setUsers] = useState([]);
+  const [trackReports, setTrackReports] = useState([]);
   const [tab, setTab] = useState('moderation');
   const [comment, setComment] = useState('');
   const [userReason, setUserReason] = useState('Нарушение правил сервиса');
   const [deletingUserId, setDeletingUserId] = useState('');
   const [adminMessage, setAdminMessage] = useState('');
+  const [adminReportMessage, setAdminReportMessage] = useState('');
+  const [resolvingReportId, setResolvingReportId] = useState('');
+  const [adminComments, setAdminComments] = useState({});
   const [loading, setLoading] = useState(true);
 
   const fetchPending = () => {
@@ -26,12 +30,23 @@ export default function Admin() {
     adminApi.users().then((r) => setUsers(r.data || [])).catch(() => setUsers([]));
   };
 
+  const fetchTrackReports = () => {
+    adminApi.trackReports('open')
+      .then((r) => setTrackReports(r.data || []))
+      .catch(() => setTrackReports([]));
+  };
+
   useEffect(() => {
     setLoading(true);
     if (tab === 'moderation') {
       adminApi.pendingTracks().then((r) => setPending(r.data || [])).catch(() => setPending([])).finally(() => setLoading(false));
     } else if (tab === 'playlists') {
       client.get('/playlists').then((r) => setPlaylists(r.data || [])).catch(() => setPlaylists([])).finally(() => setLoading(false));
+    } else if (tab === 'reports') {
+      adminApi.trackReports('open')
+        .then((r) => setTrackReports(r.data || []))
+        .catch(() => setTrackReports([]))
+        .finally(() => setLoading(false));
     } else {
       adminApi.users().then((r) => setUsers(r.data || [])).catch(() => setUsers([])).finally(() => setLoading(false));
     }
@@ -64,6 +79,20 @@ export default function Admin() {
       .finally(() => setDeletingUserId(''));
   };
 
+  const handleResolveReport = (reportId, action) => {
+    if (!reportId) return;
+    setResolvingReportId(reportId);
+    setAdminReportMessage('');
+    const adminComment = adminComments[reportId] || '';
+    adminApi.resolveTrackReport(reportId, action, adminComment)
+      .then((r) => {
+        setAdminReportMessage(r.data?.message || 'Жалоба обработана');
+        fetchTrackReports();
+      })
+      .catch((e) => setAdminReportMessage(e.response?.data?.message || 'Ошибка обработки жалобы'))
+      .finally(() => setResolvingReportId(''));
+  };
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="page admin-page">
       <h2 className="page-title">Админ-панель</h2>
@@ -71,6 +100,7 @@ export default function Admin() {
         <button type="button" className={tab === 'moderation' ? 'active' : ''} onClick={() => setTab('moderation')}>Модерация треков</button>
         <button type="button" className={tab === 'playlists' ? 'active' : ''} onClick={() => setTab('playlists')}>Плейлисты</button>
         <button type="button" className={tab === 'users' ? 'active' : ''} onClick={() => setTab('users')}>Пользователи</button>
+        <button type="button" className={tab === 'reports' ? 'active' : ''} onClick={() => setTab('reports')}>Жалобы на треки</button>
       </div>
       {tab === 'moderation' && (
         <>
@@ -167,6 +197,74 @@ export default function Admin() {
           )}
         </div>
       )}
+      {tab === 'reports' && (
+        <div className="admin-reports">
+          <p className="admin-hint">Жалобы от пользователей. Трек не скрывается сразу — решение принимает админ.</p>
+          {adminReportMessage && <div className="admin-message">{adminReportMessage}</div>}
+          {loading ? (
+            <div className="loading">Загрузка...</div>
+          ) : trackReports.length === 0 ? (
+            <div className="empty">Жалоб пока нет</div>
+          ) : (
+            <div className="reports-table-wrap">
+              <table className="reports-table">
+                <thead>
+                  <tr>
+                    <th>Трек</th>
+                    <th>Автор</th>
+                    <th>Жалобщик</th>
+                    <th>Текст жалобы</th>
+                    <th>Комментарий админа</th>
+                    <th>Действия</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {trackReports.map((rep) => (
+                    <tr key={rep._id}>
+                      <td>{rep.track?.title || '-'}</td>
+                      <td>{rep.track?.author?.username || '-'}</td>
+                      <td>{rep.reporter?.username || '-'}</td>
+                      <td className="rep-text">
+                        {rep.text}
+                        <div className="rep-ai">AI: {rep.aiSuggestedAction || '-'}</div>
+                      </td>
+                      <td>
+                        <textarea
+                          className="rep-admin-comment"
+                          rows={3}
+                          value={adminComments[rep._id] || ''}
+                          onChange={(e) => setAdminComments((prev) => ({ ...prev, [rep._id]: e.target.value }))}
+                          placeholder="Опишите решение админа"
+                        />
+                      </td>
+                      <td>
+                        <div className="rep-actions">
+                          <button
+                            type="button"
+                            className="admin-btn approve"
+                            disabled={resolvingReportId === rep._id}
+                            onClick={() => handleResolveReport(rep._id, 'leave')}
+                          >
+                            {resolvingReportId === rep._id ? '...' : 'Оставить'}
+                          </button>
+                          <button
+                            type="button"
+                            className="admin-btn reject"
+                            disabled={resolvingReportId === rep._id}
+                            onClick={() => handleResolveReport(rep._id, 'rejectTrack')}
+                          >
+                            {resolvingReportId === rep._id ? '...' : 'Отклонить трек'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
       <style>{`
         .page-title { color: var(--neon-cyan); margin-bottom: 24px; }
         .admin-page {
@@ -249,6 +347,42 @@ export default function Admin() {
           font-weight: 600;
         }
         .loading, .empty { padding: 24px; color: var(--text-dim); }
+
+        .reports-table-wrap {
+          overflow-x: auto;
+          border: 1px solid rgba(5, 217, 232, 0.2);
+          border-radius: 10px;
+          margin-top: 12px;
+        }
+        .reports-table {
+          width: 100%;
+          border-collapse: collapse;
+          min-width: 980px;
+        }
+        .reports-table th,
+        .reports-table td {
+          padding: 10px 12px;
+          border-bottom: 1px solid rgba(5, 217, 232, 0.12);
+          text-align: left;
+          font-size: 0.9rem;
+          vertical-align: top;
+        }
+        .reports-table th {
+          color: var(--neon-cyan);
+          font-weight: 600;
+        }
+        .rep-text { max-width: 320px; }
+        .rep-ai { margin-top: 6px; color: var(--text-dim); font-size: 0.8rem; }
+        .rep-admin-comment {
+          width: 260px;
+          background: rgba(0,0,0,0.25);
+          border: 1px solid rgba(5, 217, 232, 0.35);
+          border-radius: 10px;
+          padding: 8px 10px;
+          color: var(--text);
+          resize: vertical;
+        }
+        .rep-actions { display: flex; flex-direction: column; gap: 8px; }
         @media (max-width: 900px) {
           .admin-page { padding-left: 0; padding-right: 0; }
         }
