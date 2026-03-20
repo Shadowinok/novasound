@@ -27,7 +27,7 @@ export default function VerifyEmail() {
   }, [token]);
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="page">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="page verify-email-page">
       <h2 className="page-title">Подтверждение email</h2>
       <div className={status === 'ok' ? 'notice ok' : status === 'error' ? 'notice err' : 'notice'}>
         {status === 'loading' ? 'Проверяем ссылку...' : message}
@@ -36,6 +36,12 @@ export default function VerifyEmail() {
         <Link to="/login" className="neon-btn">Перейти ко входу</Link>
       </div>
       <style>{`
+        .verify-email-page {
+          max-width: 1100px;
+          margin: 0 auto;
+          padding-left: 280px;
+          padding-right: 24px;
+        }
         .page-title { color: var(--neon-cyan); margin-bottom: 16px; }
         .notice {
           padding: 16px;
@@ -57,6 +63,9 @@ export default function VerifyEmail() {
           transition: all 0.2s;
         }
         .neon-btn:hover { background: rgba(5, 217, 232, 0.2); box-shadow: var(--glow-cyan); }
+        @media (max-width: 900px) {
+          .verify-email-page { padding-left: 0; padding-right: 0; }
+        }
       `}</style>
     </motion.div>
   );
