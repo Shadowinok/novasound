@@ -55,7 +55,8 @@ export const tracks = {
   update: (id, data) => client.put(`/tracks/${id}`, data),
   delete: (id) => client.delete(`/tracks/${id}`),
   play: (id) => client.post(`/tracks/${id}/play`),
-  like: (id) => client.post(`/tracks/${id}/like`)
+  like: (id) => client.post(`/tracks/${id}/like`),
+  report: (id, text) => client.post(`/tracks/${id}/report`, { text })
 };
 
 export const charts = {
@@ -80,7 +81,9 @@ export const admin = {
   deleteUser: (id, reason) => client.delete(`/admin/users/${id}`, { data: { reason } }),
   pendingTracks: () => client.get('/admin/tracks/pending'),
   approveTrack: (id, comment) => client.put(`/admin/tracks/${id}/approve`, { comment }),
-  rejectTrack: (id, comment) => client.put(`/admin/tracks/${id}/reject`, { comment })
+  rejectTrack: (id, comment) => client.put(`/admin/tracks/${id}/reject`, { comment }),
+  trackReports: (status) => client.get('/admin/track-reports', { params: { status: status || 'open' } }),
+  resolveTrackReport: (reportId, action, adminComment) => client.put(`/admin/track-reports/${reportId}/resolve`, { action, adminComment })
 };
 
 export function getAudioUrl(track) {
