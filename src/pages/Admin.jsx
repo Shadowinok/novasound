@@ -227,6 +227,8 @@ export default function Admin() {
                       <td className="rep-text">
                         {rep.text}
                         <div className="rep-ai">AI: {rep.aiSuggestedAction || '-'}</div>
+                        <div className="rep-ai">Попытка: {rep.attemptNumber || 1}/4</div>
+                        <div className="rep-ai">Уникальных жалобщиков: {rep.uniqueReporters || 1}</div>
                       </td>
                       <td>
                         <textarea
