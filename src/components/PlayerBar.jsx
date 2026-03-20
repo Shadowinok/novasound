@@ -4,7 +4,7 @@ import { usePlayer } from '../context/PlayerContext';
 import { getAudioUrl } from '../api/client';
 
 export default function PlayerBar() {
-  const { currentTrack, playing, progress, duration, togglePlay, seek } = usePlayer();
+  const { currentTrack, playing, progress, duration, volume, togglePlay, seek, setPlayerVolume } = usePlayer();
 
   const formatTime = (s) => {
     if (!s || isNaN(s)) return '0:00';
@@ -47,6 +47,17 @@ export default function PlayerBar() {
             className="player-slider"
           />
           <span className="player-time">{formatTime(duration)}</span>
+        </div>
+        <div className="player-volume">
+          <span className="volume-label">🔊</span>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={Math.round((volume || 0) * 100)}
+            onChange={(e) => setPlayerVolume(Number(e.target.value) / 100)}
+            className="player-slider volume-slider"
+          />
         </div>
         <style>{`
           .player-bar {
@@ -94,6 +105,13 @@ export default function PlayerBar() {
             gap: 12px;
             max-width: 500px;
           }
+          .player-volume {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 150px;
+          }
+          .volume-label { color: var(--text-dim); font-size: 0.9rem; }
           .player-btn {
             width: 44px;
             height: 44px;
@@ -130,6 +148,12 @@ export default function PlayerBar() {
             background: var(--neon-cyan);
             box-shadow: 0 0 10px var(--neon-cyan);
             cursor: pointer;
+          }
+          .volume-slider { max-width: 120px; }
+          @media (max-width: 900px) {
+            .player-bar { flex-wrap: wrap; gap: 12px; }
+            .player-controls { min-width: 100%; max-width: 100%; }
+            .player-volume { margin-left: auto; }
           }
         `}</style>
       </motion.div>
