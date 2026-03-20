@@ -33,7 +33,23 @@ export default function UploadTrack({ onClose, onSuccess }) {
       .then(() => onSuccess())
       .catch((err) => {
         const validationMessage = err.response?.data?.errors?.[0]?.msg;
-        const message = validationMessage || err.response?.data?.message || err.message || 'Ошибка загрузки';
+        const apiMessage = err.response?.data?.message;
+        const status = err.response?.status;
+        const networkMessage = err.message;
+        const message = validationMessage
+          || apiMessage
+          || (status ? `Ошибка загрузки (HTTP ${status})` : '')
+          || networkMessage
+          || 'Ошибка загрузки';
+        // Локальная диагностика, чтобы понять, где ломается загрузка в проде.
+        // eslint-disable-next-line no-console
+        console.error('UploadTrack error', {
+          status,
+          apiMessage,
+          validationMessage,
+          networkMessage,
+          data: err.response?.data
+        });
         setError(message);
       })
       .finally(() => setLoading(false));
