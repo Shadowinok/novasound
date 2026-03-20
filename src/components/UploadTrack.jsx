@@ -31,7 +31,11 @@ export default function UploadTrack({ onClose, onSuccess }) {
     if (coverFile) formData.append('cover', coverFile);
     tracksApi.createWithProgress(formData, ({ pct }) => setProgress(pct))
       .then(() => onSuccess())
-      .catch((err) => setError(err.response?.data?.message || 'Ошибка загрузки'))
+      .catch((err) => {
+        const validationMessage = err.response?.data?.errors?.[0]?.msg;
+        const message = validationMessage || err.response?.data?.message || err.message || 'Ошибка загрузки';
+        setError(message);
+      })
       .finally(() => setLoading(false));
   };
 
