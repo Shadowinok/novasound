@@ -9,6 +9,11 @@ export function PlayerProvider({ children }) {
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [volume, setVolume] = useState(() => {
+    const saved = Number(localStorage.getItem('novasound_volume'));
+    if (Number.isFinite(saved) && saved >= 0 && saved <= 1) return saved;
+    return 1;
+  });
   const howlRef = useRef(null);
 
   const loadTrack = useCallback((track) => {
@@ -30,6 +35,7 @@ export function PlayerProvider({ children }) {
       src: [url],
       html5: true,
       format: ['mp3', 'ogg', 'm4a', 'wav'],
+      volume,
       onload: () => setDuration(howl.duration()),
       onend: () => {
         setPlaying(false);
@@ -46,6 +52,13 @@ export function PlayerProvider({ children }) {
     setPlaying(true);
     howl.play();
     tracksApi.play(track._id).catch(() => {});
+  }, []);
+
+  const setPlayerVolume = useCallback((nextVolume) => {
+    const v = Math.max(0, Math.min(1, Number(nextVolume) || 0));
+    setVolume(v);
+    localStorage.setItem('novasound_volume', String(v));
+    if (howlRef.current) howlRef.current.volume(v);
   }, []);
 
   const togglePlay = useCallback(() => {
@@ -79,9 +92,11 @@ export function PlayerProvider({ children }) {
       playing,
       progress,
       duration,
+      volume,
       loadTrack,
       togglePlay,
       seek,
+      setPlayerVolume,
       setProgress,
       setDuration
     }}>
