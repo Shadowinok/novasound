@@ -41,6 +41,7 @@ export const tracks = {
   list: (params) => client.get('/tracks', { params }),
   get: (id) => client.get(`/tracks/${id}`),
   my: (params) => client.get('/tracks/my', { params }),
+  myReports: () => client.get('/tracks/my/reports'),
   create: (formData) => client.post('/tracks', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
   createWithProgress: (formData, onProgress) => client.post('/tracks', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
@@ -67,7 +68,11 @@ export const charts = {
 
 export const playlists = {
   list: () => client.get('/playlists'),
+  myList: () => client.get('/playlists/my/list'),
   get: (id) => client.get(`/playlists/${id}`),
+  createMy: (data) => client.post('/playlists/my', data),
+  addTrack: (playlistId, trackId) => client.post(`/playlists/${playlistId}/tracks/${trackId}`),
+  removeTrack: (playlistId, trackId) => client.delete(`/playlists/${playlistId}/tracks/${trackId}`),
   create: (formData) => client.post('/playlists', formData, { headers: formData instanceof FormData ? {} : { 'Content-Type': 'application/json' } }),
   update: (id, data) => {
     if (data instanceof FormData) return client.put(`/playlists/${id}`, data);
