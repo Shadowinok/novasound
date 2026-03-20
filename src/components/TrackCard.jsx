@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { createPortal } from 'react-dom';
 import { usePlayer } from '../context/PlayerContext';
 import { useAuth } from '../context/AuthContext';
 import client, { playlists as playlistsApi } from '../api/client';
@@ -132,7 +133,7 @@ export default function TrackCard({ track, showStatus }) {
       </div>
       {actionMessage && <div className="track-action-msg">{actionMessage}</div>}
 
-      {showReport && (
+      {showReport && createPortal((
         <div className="card-overlay" onClick={() => setShowReport(false)}>
           <div className="card-modal" onClick={(e) => e.stopPropagation()}>
             <h4>Жалоба на трек</h4>
@@ -149,9 +150,9 @@ export default function TrackCard({ track, showStatus }) {
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
 
-      {showPlaylist && (
+      {showPlaylist && createPortal((
         <div className="card-overlay" onClick={() => setShowPlaylist(false)}>
           <div className="card-modal" onClick={(e) => e.stopPropagation()}>
             <h4>Добавить в плейлист</h4>
@@ -175,7 +176,7 @@ export default function TrackCard({ track, showStatus }) {
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
       <style>{`
         .track-card {
           background: var(--bg-card);
@@ -183,6 +184,8 @@ export default function TrackCard({ track, showStatus }) {
           border: 1px solid rgba(5, 217, 232, 0.2);
           overflow: hidden;
           transition: border-color 0.2s;
+          justify-self: start;
+          width: min(100%, 220px);
         }
         .track-card:hover { border-color: var(--neon-cyan); }
         .track-card-link { display: block; text-decoration: none; color: inherit; }
