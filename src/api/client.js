@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-const API_BASE = import.meta.env.VITE_API_URL || '/api';
+const API_BASE = import.meta.env.VITE_API_URL
+  || (import.meta.env.DEV ? '/api' : 'https://novasound-api.onrender.com/api');
+const API_ORIGIN = API_BASE.endsWith('/api') ? API_BASE.slice(0, -4) : API_BASE;
 
 const client = axios.create({
   baseURL: API_BASE,
@@ -91,8 +93,12 @@ export const admin = {
   resolveTrackReport: (reportId, action, adminComment) => client.put(`/admin/track-reports/${reportId}/resolve`, { action, adminComment })
 };
 
+/** URL стрима; для HTML5 <audio> JWT передаётся в query (?token=), заголовок туда не попадает */
 export function getAudioUrl(track) {
   if (!track?.audioFileId) return '';
-  const base = import.meta.env.VITE_API_URL || '';
-  return `${base}/tracks/audio/${track.audioFileId}`;
+  const base = `${API_ORIGIN}/api/tracks/audio/${track.audioFileId}`;
+  if (typeof localStorage === 'undefined') return base;
+  const token = localStorage.getItem('novasound_token');
+  if (!token) return base;
+  return `${base}?token=${encodeURIComponent(token)}`;
 }
