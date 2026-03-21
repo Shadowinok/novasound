@@ -61,8 +61,9 @@ export const tracks = {
    * (тело уходит не multipart / без boundary), сервер не видит файл.
    */
   updateCover: async (id, formData) => {
+    const idStr = String(id ?? '').trim();
     const token = typeof localStorage !== 'undefined' ? localStorage.getItem('novasound_token') : null;
-    const url = `${API_BASE.replace(/\/$/, '')}/tracks/${id}/cover`;
+    const url = `${API_BASE.replace(/\/$/, '')}/tracks/${encodeURIComponent(idStr)}/cover`;
     const res = await fetch(url, {
       method: 'PUT',
       headers: {
