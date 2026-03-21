@@ -24,6 +24,7 @@ export default function Profile() {
   const [coverTrackId, setCoverTrackId] = useState('');
   const [coverUploading, setCoverUploading] = useState(false);
   const [coverError, setCoverError] = useState('');
+  const [coverOk, setCoverOk] = useState(false);
   const coverInputRef = useRef(null);
 
   const fetchMyTracks = () => {
@@ -44,6 +45,12 @@ export default function Profile() {
     fetchMyTracks();
     fetchMyReports();
   }, [statusFilter]);
+
+  useEffect(() => {
+    if (!coverOk) return undefined;
+    const t = setTimeout(() => setCoverOk(false), 4000);
+    return () => clearTimeout(t);
+  }, [coverOk]);
 
   const stats = useMemo(() => {
     const list = Array.isArray(tracks) ? tracks : [];
@@ -98,6 +105,7 @@ export default function Profile() {
 
   const openCoverPicker = (trackId) => {
     setCoverError('');
+    setCoverOk(false);
     setCoverTrackId(trackId);
     if (coverInputRef.current) coverInputRef.current.value = '';
     coverInputRef.current?.click();
@@ -110,9 +118,22 @@ export default function Profile() {
     fd.append('cover', file);
     setCoverUploading(true);
     setCoverError('');
+    setCoverOk(false);
     tracksApi.updateCover(coverTrackId, fd)
-      .then(() => fetchMyTracks())
-      .catch((err) => setCoverError(err.response?.data?.message || 'Не удалось загрузить обложку'))
+      .then(() => {
+        setCoverOk(true);
+        fetchMyTracks();
+      })
+      .catch((err) => {
+        const d = err.response?.data;
+        const msg =
+          d?.message
+          || d?.errors?.[0]?.msg
+          || (Array.isArray(d?.errors) && d.errors[0] && (d.errors[0].msg || d.errors[0].message))
+          || err.message
+          || 'Не удалось загрузить обложку';
+        setCoverError(msg);
+      })
       .finally(() => {
         setCoverUploading(false);
         setCoverTrackId('');
@@ -130,6 +151,7 @@ export default function Profile() {
         className="profile-cover-input"
         onChange={handleCoverFile}
       />
+      {coverOk && <div className="profile-cover-ok">Обложка обновлена</div>}
       {coverError && <div className="profile-cover-error">{coverError}</div>}
       <div className="profile-toolbar">
         <select
@@ -296,6 +318,7 @@ export default function Profile() {
         }
         .neon-btn:hover { background: rgba(5, 217, 232, 0.2); }
         .profile-cover-input { position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none; }
+        .profile-cover-ok { color: #69db7c; margin-bottom: 12px; }
         .profile-cover-error { color: #ff6b6b; margin-bottom: 12px; }
         .logout-btn {
           appearance: none;
