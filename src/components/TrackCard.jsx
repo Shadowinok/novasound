@@ -25,6 +25,10 @@ export default function TrackCard({ track, showStatus }) {
 
   const handlePlay = (e) => {
     e.preventDefault();
+    if (!user) {
+      navigate('/login');
+      return;
+    }
     loadTrack(track);
   };
 
@@ -110,8 +114,8 @@ export default function TrackCard({ track, showStatus }) {
           className="track-cover"
           style={{ backgroundImage: track.coverImage ? `url(${track.coverImage})` : 'linear-gradient(135deg, var(--neon-purple), var(--neon-pink))' }}
         >
-          <button type="button" className="track-play-btn" onClick={handlePlay}>
-            {isCurrent && playing ? '⏸' : '▶'}
+          <button type="button" className="track-play-btn" onClick={handlePlay} title={user ? 'Слушать' : 'Войдите, чтобы слушать'}>
+            {!user ? '🔒' : isCurrent && playing ? '⏸' : '▶'}
           </button>
         </div>
         <div className="track-info">
