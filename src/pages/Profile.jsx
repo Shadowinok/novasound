@@ -120,7 +120,14 @@ export default function Profile() {
     setCoverError('');
     setCoverOk(false);
     tracksApi.updateCover(coverTrackId, fd)
-      .then(() => {
+      .then((r) => {
+        const u = r?.data;
+        if (u && u._id) {
+          setTracks((prev) =>
+            prev.map((t) => (String(t._id) === String(u._id) ? { ...t, ...u } : t))
+          );
+          window.dispatchEvent(new CustomEvent('novasound_track_cover', { detail: { track: u } }));
+        }
         setCoverOk(true);
         fetchMyTracks();
       })
@@ -132,7 +139,8 @@ export default function Profile() {
           || (Array.isArray(d?.errors) && d.errors[0] && (d.errors[0].msg || d.errors[0].message))
           || err.message
           || 'Не удалось загрузить обложку';
-        setCoverError(msg);
+        const code = err.response?.status;
+        setCoverError(code ? `${msg} (код ${code})` : msg);
       })
       .finally(() => {
         setCoverUploading(false);
