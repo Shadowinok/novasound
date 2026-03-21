@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import client, { tracks as tracksApi, users as usersApi } from '../api/client';
@@ -21,6 +21,10 @@ export default function Profile() {
   const [deleteTrackId, setDeleteTrackId] = useState('');
   const [deleteTrackLoading, setDeleteTrackLoading] = useState(false);
   const [reports, setReports] = useState([]);
+  const [coverTrackId, setCoverTrackId] = useState('');
+  const [coverUploading, setCoverUploading] = useState(false);
+  const [coverError, setCoverError] = useState('');
+  const coverInputRef = useRef(null);
 
   const fetchMyTracks = () => {
     setLoading(true);
@@ -92,9 +96,41 @@ export default function Profile() {
       });
   };
 
+  const openCoverPicker = (trackId) => {
+    setCoverError('');
+    setCoverTrackId(trackId);
+    if (coverInputRef.current) coverInputRef.current.value = '';
+    coverInputRef.current?.click();
+  };
+
+  const handleCoverFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !coverTrackId) return;
+    const fd = new FormData();
+    fd.append('cover', file);
+    setCoverUploading(true);
+    setCoverError('');
+    tracksApi.updateCover(coverTrackId, fd)
+      .then(() => fetchMyTracks())
+      .catch((err) => setCoverError(err.response?.data?.message || 'Не удалось загрузить обложку'))
+      .finally(() => {
+        setCoverUploading(false);
+        setCoverTrackId('');
+        e.target.value = '';
+      });
+  };
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="page profile-page">
       <h2 className="page-title">Мои треки</h2>
+      <input
+        ref={coverInputRef}
+        type="file"
+        accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+        className="profile-cover-input"
+        onChange={handleCoverFile}
+      />
+      {coverError && <div className="profile-cover-error">{coverError}</div>}
       <div className="profile-toolbar">
         <select
           value={statusFilter}
@@ -208,6 +244,16 @@ export default function Profile() {
             <div key={t._id} className="my-track">
               <TrackCard track={t} showStatus />
               <div className="my-track-actions">
+                {t.status === 'approved' && (
+                  <button
+                    type="button"
+                    className="my-track-cover"
+                    disabled={coverUploading}
+                    onClick={() => openCoverPicker(t._id)}
+                  >
+                    {coverUploading && coverTrackId === t._id ? 'Загрузка...' : 'Сменить обложку'}
+                  </button>
+                )}
                 <button
                   type="button"
                   className="my-track-delete"
@@ -249,6 +295,8 @@ export default function Profile() {
           font-weight: 600;
         }
         .neon-btn:hover { background: rgba(5, 217, 232, 0.2); }
+        .profile-cover-input { position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none; }
+        .profile-cover-error { color: #ff6b6b; margin-bottom: 12px; }
         .logout-btn {
           appearance: none;
           -webkit-appearance: none;
@@ -317,7 +365,17 @@ export default function Profile() {
           gap: 20px;
         }
         .my-track { display: flex; flex-direction: column; gap: 10px; }
-        .my-track-actions { display: flex; justify-content: flex-end; }
+        .my-track-actions { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; align-items: center; }
+        .my-track-cover {
+          padding: 8px 14px;
+          border: 1px solid rgba(5, 217, 232, 0.6);
+          background: rgba(0,0,0,0.25);
+          color: var(--neon-cyan);
+          border-radius: 8px;
+          font-size: 0.9rem;
+        }
+        .my-track-cover:hover:not(:disabled) { background: rgba(5, 217, 232, 0.12); }
+        .my-track-cover:disabled { opacity: 0.6; }
         .my-track-delete {
           padding: 8px 12px;
           border: 1px solid rgba(255, 50, 50, 0.7);
