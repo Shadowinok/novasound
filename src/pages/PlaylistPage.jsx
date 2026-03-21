@@ -17,13 +17,21 @@ export default function PlaylistPage() {
   }, [id]);
 
   if (loading || !playlist) {
-    return <div className="page"><div className="loading">Загрузка...</div></div>;
+    return (
+      <div className="page playlist-detail-page">
+        <div className="loading">Загрузка...</div>
+        <style>{`
+          .playlist-detail-page { max-width: 1100px; margin: 0 auto; padding-left: 280px; padding-right: 24px; }
+          @media (max-width: 900px) { .playlist-detail-page { padding-left: 0; padding-right: 0; } }
+        `}</style>
+      </div>
+    );
   }
 
   const tracks = (playlist.tracks || []).filter(Boolean);
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="page">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="page playlist-detail-page">
       <div className="playlist-header">
         <div
           className="playlist-header-cover"
@@ -41,6 +49,12 @@ export default function PlaylistPage() {
         ))}
       </div>
       <style>{`
+        .playlist-detail-page {
+          max-width: 1100px;
+          margin: 0 auto;
+          padding-left: 280px;
+          padding-right: 24px;
+        }
         .playlist-header {
           display: flex;
           gap: 24px;
@@ -62,6 +76,9 @@ export default function PlaylistPage() {
           gap: 20px;
         }
         .loading { text-align: center; padding: 48px; color: var(--text-dim); }
+        @media (max-width: 900px) {
+          .playlist-detail-page { padding-left: 0; padding-right: 0; }
+        }
       `}</style>
     </motion.div>
   );

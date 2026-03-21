@@ -12,7 +12,7 @@ export default function Playlists() {
   }, []);
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="page">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="page playlists-page">
       <h2 className="page-title">Плейлисты</h2>
       {loading ? (
         <div className="loading">Загрузка...</div>
@@ -33,6 +33,12 @@ export default function Playlists() {
         </div>
       )}
       <style>{`
+        .playlists-page {
+          max-width: 1100px;
+          margin: 0 auto;
+          padding-left: 280px;
+          padding-right: 24px;
+        }
         .page-title { color: var(--neon-cyan); margin-bottom: 24px; }
         .playlist-grid {
           display: grid;
@@ -51,6 +57,9 @@ export default function Playlists() {
         .playlist-title { display: block; padding: 12px; font-family: var(--font-display); color: var(--neon-cyan); }
         .playlist-desc { display: block; padding: 0 12px 12px; font-size: 0.85rem; color: var(--text-dim); }
         .loading, .empty { text-align: center; padding: 48px; color: var(--text-dim); }
+        @media (max-width: 900px) {
+          .playlists-page { padding-left: 0; padding-right: 0; }
+        }
       `}</style>
     </motion.div>
   );
