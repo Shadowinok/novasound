@@ -56,9 +56,38 @@ export const tracks = {
     }
   }),
   update: (id, data) => client.put(`/tracks/${id}`, data),
-  /** multipart: поле cover — jpg/png/webp, только для status === approved */
-  updateCover: (id, formData) =>
-    client.put(`/tracks/${id}/cover`, formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  /**
+   * Смена обложки: через fetch, не axios — у axios с default JSON FormData ломается
+   * (тело уходит не multipart / без boundary), сервер не видит файл.
+   */
+  updateCover: async (id, formData) => {
+    const token = typeof localStorage !== 'undefined' ? localStorage.getItem('novasound_token') : null;
+    const url = `${API_BASE.replace(/\/$/, '')}/tracks/${id}/cover`;
+    const res = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: formData
+    });
+    let data = {};
+    try {
+      data = await res.json();
+    } catch (_) {
+      data = {};
+    }
+    if (res.status === 401 || res.status === 403) {
+      localStorage.removeItem('novasound_token');
+      localStorage.removeItem('novasound_user');
+      window.dispatchEvent(new Event('auth_logout'));
+    }
+    if (!res.ok) {
+      const err = new Error(data.message || 'Не удалось загрузить обложку');
+      err.response = { status: res.status, data };
+      throw err;
+    }
+    return { data };
+  },
   delete: (id) => client.delete(`/tracks/${id}`),
   play: (id) => client.post(`/tracks/${id}/play`),
   like: (id) => client.post(`/tracks/${id}/like`),
