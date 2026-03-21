@@ -49,6 +49,7 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('novasound_token');
     localStorage.removeItem('novasound_user');
     setUser(null);
+    window.dispatchEvent(new Event('auth_logout'));
   };
 
   return (

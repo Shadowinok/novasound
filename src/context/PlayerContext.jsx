@@ -28,9 +28,10 @@ export function PlayerProvider({ children }) {
       setDuration(0);
       return;
     }
+    const token = localStorage.getItem('novasound_token');
+    if (!token) return;
     const url = getAudioUrl(track);
     if (!url) return;
-    const token = localStorage.getItem('novasound_token');
     const howl = new Howl({
       src: [url],
       html5: true,
@@ -43,7 +44,7 @@ export function PlayerProvider({ children }) {
       },
       onplay: () => setPlaying(true),
       onpause: () => setPlaying(false),
-      ...(token && { xhrWithCredentials: true })
+      xhrWithCredentials: true
     });
     howlRef.current = howl;
     setCurrentTrack(track);
@@ -52,6 +53,21 @@ export function PlayerProvider({ children }) {
     setPlaying(true);
     howl.play();
     tracksApi.play(track._id).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const clearPlayer = () => {
+      if (howlRef.current) {
+        howlRef.current.unload();
+        howlRef.current = null;
+      }
+      setCurrentTrack(null);
+      setPlaying(false);
+      setProgress(0);
+      setDuration(0);
+    };
+    window.addEventListener('auth_logout', clearPlayer);
+    return () => window.removeEventListener('auth_logout', clearPlayer);
   }, []);
 
   const setPlayerVolume = useCallback((nextVolume) => {
