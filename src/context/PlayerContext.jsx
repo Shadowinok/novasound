@@ -70,6 +70,18 @@ export function PlayerProvider({ children }) {
     return () => window.removeEventListener('auth_logout', clearPlayer);
   }, []);
 
+  useEffect(() => {
+    const onCover = (e) => {
+      const t = e.detail?.track;
+      if (!t?._id) return;
+      setCurrentTrack((cur) =>
+        cur && String(cur._id) === String(t._id) ? { ...cur, coverImage: t.coverImage } : cur
+      );
+    };
+    window.addEventListener('novasound_track_cover', onCover);
+    return () => window.removeEventListener('novasound_track_cover', onCover);
+  }, []);
+
   const setPlayerVolume = useCallback((nextVolume) => {
     const v = Math.max(0, Math.min(1, Number(nextVolume) || 0));
     setVolume(v);
