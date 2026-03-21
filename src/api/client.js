@@ -56,6 +56,9 @@ export const tracks = {
     }
   }),
   update: (id, data) => client.put(`/tracks/${id}`, data),
+  /** multipart: поле cover — jpg/png/webp, только для status === approved */
+  updateCover: (id, formData) =>
+    client.put(`/tracks/${id}/cover`, formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
   delete: (id) => client.delete(`/tracks/${id}`),
   play: (id) => client.post(`/tracks/${id}/play`),
   like: (id) => client.post(`/tracks/${id}/like`),
