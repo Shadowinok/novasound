@@ -37,6 +37,10 @@ export default function TrackPage() {
   }, [id, user?.id]);
 
   const handlePlay = () => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
     if (track) loadTrack(track);
   };
 
@@ -130,13 +134,16 @@ export default function TrackPage() {
           className="track-detail-cover"
           style={{ backgroundImage: track.coverImage ? `url(${track.coverImage})` : 'linear-gradient(135deg, var(--neon-purple), var(--neon-pink))' }}
         >
-          <button type="button" className="big-play" onClick={handlePlay}>
-            {isCurrent && playing ? '⏸' : '▶'}
+          <button type="button" className="big-play" onClick={handlePlay} title={user ? 'Слушать' : 'Войдите, чтобы слушать'}>
+            {!user ? '🔒' : isCurrent && playing ? '⏸' : '▶'}
           </button>
         </div>
         <div className="track-detail-info">
           <h1 className="track-detail-title">{track.title}</h1>
           <p className="track-detail-author">{track.author?.username}</p>
+          {!user && (
+            <p className="track-login-hint">Войдите, чтобы слушать треки. Без регистрации доступна только информация о треках.</p>
+          )}
           <div className="track-detail-stats">
             <span>▶ {track.plays ?? 0}</span>
             <button type="button" className={`like-btn ${liked ? 'liked' : ''}`} onClick={handleLike}>
@@ -184,6 +191,7 @@ export default function TrackPage() {
         .big-play:hover { background: rgba(255, 42, 109, 0.6); }
         .track-detail-title { font-size: 1.8rem; color: var(--neon-cyan); margin-bottom: 8px; }
         .track-detail-author { color: var(--text-dim); margin-bottom: 12px; }
+        .track-login-hint { color: #ffc800; font-size: 0.95rem; margin-bottom: 12px; max-width: 420px; }
         .track-detail-stats { display: flex; gap: 16px; margin-bottom: 16px; }
         .like-btn {
           border: 1px solid var(--neon-pink);
