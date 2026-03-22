@@ -12,6 +12,17 @@
 </head>
 <body>
   <div id="root"></div>
+  <!-- REG.RU: явный API на Render (обходит ошибочный VITE_API_URL в билде). Другой домен — вручную: window.NOVASOUND_API_BASE -->
+  <script>
+    (function () {
+      try {
+        var h = location.hostname;
+        if (/^([\w-]+\.)*novasoundapp\.ru$/.test(h)) {
+          window.NOVASOUND_API_BASE = 'https://novasound-api.onrender.com/api';
+        }
+      } catch (e) {}
+    })();
+  </script>
   <script type="module" src="/src/main.jsx"></script>
 </body>
 </html>
