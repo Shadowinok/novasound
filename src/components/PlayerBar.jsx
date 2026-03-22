@@ -121,7 +121,7 @@ export default function PlayerBar() {
         <style>{`
           .player-bar {
             position: fixed;
-            bottom: 0;
+            bottom: var(--footer-dock-height, 0px);
             left: 0;
             right: 0;
             z-index: 90;

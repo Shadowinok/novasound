@@ -72,7 +72,7 @@ export default function RadialMenu({ user, isAdmin }) {
       <style>{`
         .radial-menu {
           position: fixed;
-          bottom: 24px;
+          bottom: calc(24px + var(--footer-dock-height, 30px));
           left: 50%;
           transform: translateX(-50%);
           width: 180px;

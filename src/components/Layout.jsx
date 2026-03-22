@@ -51,14 +51,13 @@ export default function Layout() {
         <main className="main">
           <Outlet />
         </main>
-        <footer className="site-footer">
-          {pathname !== '/about' && <Link to="/about">О проекте</Link>}
-          {pathname !== '/radio' && <Link to="/radio">Радио</Link>}
-          {pathname !== '/terms' && <Link to="/terms">Правила</Link>}
-        </footer>
       </div>
       <RadialMenu user={user} isAdmin={isAdmin} />
       <PlayerBar />
+      <footer className="site-footer site-footer--dock" aria-label="Служебные ссылки">
+        {pathname !== '/about' && <Link to="/about">О проекте</Link>}
+        {pathname !== '/terms' && <Link to="/terms">Правила</Link>}
+      </footer>
     </div>
   );
 }
