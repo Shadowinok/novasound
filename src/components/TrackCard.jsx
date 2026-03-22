@@ -22,6 +22,8 @@ export default function TrackCard({ track, showStatus, coverDisplayUrl, showPend
   const [showPlaylist, setShowPlaylist] = useState(false);
   const [myPlaylists, setMyPlaylists] = useState([]);
   const [newPlaylistTitle, setNewPlaylistTitle] = useState('');
+  /** по умолчанию выкл — плейлист только у вас; включите, чтобы показывать на главной и в разделе «Плейлисты» */
+  const [newPlaylistPublic, setNewPlaylistPublic] = useState(false);
   const [actionMessage, setActionMessage] = useState('');
 
   const coverRaw = coverDisplayUrl || track.coverImage;
@@ -78,13 +80,14 @@ export default function TrackCard({ track, showStatus, coverDisplayUrl, showPend
   const openPlaylistModal = () => {
     if (!ensureAuth()) return;
     setActionMessage('');
+    setNewPlaylistPublic(false);
     setShowPlaylist(true);
     playlistsApi.myList().then((r) => setMyPlaylists(r.data || [])).catch(() => setMyPlaylists([]));
   };
 
   const handleCreatePlaylist = () => {
     if (!newPlaylistTitle.trim()) return;
-    playlistsApi.createMy({ title: newPlaylistTitle.trim() })
+    playlistsApi.createMy({ title: newPlaylistTitle.trim(), isPublic: newPlaylistPublic })
       .then((r) => {
         setMyPlaylists((prev) => [r.data, ...prev]);
         setNewPlaylistTitle('');
@@ -209,6 +212,14 @@ export default function TrackCard({ track, showStatus, coverDisplayUrl, showPend
               />
               <button type="button" className="mini-btn primary" onClick={handleCreatePlaylist}>Создать</button>
             </div>
+            <label className="playlist-public-label">
+              <input
+                type="checkbox"
+                checked={newPlaylistPublic}
+                onChange={(e) => setNewPlaylistPublic(e.target.checked)}
+              />
+              Показать в каталоге и на главной
+            </label>
             <div className="playlist-list">
               {myPlaylists.map((p) => (
                 <div key={p._id} className="playlist-row">
@@ -359,6 +370,15 @@ export default function TrackCard({ track, showStatus, coverDisplayUrl, showPend
         .mini-btn.primary {
           border-color: var(--neon-cyan);
           color: var(--neon-cyan);
+        }
+        .playlist-public-label {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 0.85rem;
+          color: var(--text-dim);
+          margin: 0 0 8px;
+          cursor: pointer;
         }
         .new-playlist {
           display: grid;
