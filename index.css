@@ -1,0 +1,89 @@
+:root {
+  /** Полоска «О проекте / Правила» у нижнего края экрана — плеер сдвигается вверх на эту величину */
+  --footer-dock-height: 30px;
+  --bg-dark: #0a0a0f;
+  --bg-card: rgba(15, 15, 25, 0.85);
+  --neon-pink: #ff2a6d;
+  --neon-cyan: #05d9e8;
+  --neon-purple: #d300c5;
+  --neon-blue: #0055ff;
+  --text: #e0e0e0;
+  --text-dim: #888;
+  --glow-pink: 0 0 20px rgba(255, 42, 109, 0.5);
+  --glow-cyan: 0 0 20px rgba(5, 217, 232, 0.5);
+  --glow-purple: 0 0 20px rgba(211, 0, 197, 0.5);
+  --font-display: 'Orbitron', sans-serif;
+  --font-body: 'Rajdhani', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg-dark);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+a {
+  color: var(--neon-cyan);
+  text-decoration: none;
+}
+
+button {
+  font-family: var(--font-body);
+  cursor: pointer;
+}
+
+input, textarea {
+  font-family: var(--font-body);
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(255,255,255,0.05);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--neon-purple);
+  border-radius: 4px;
+}
+.radial-menu {
+  left: 40px !important;      /* как близко к левому краю */
+  top: 80px !important;       /* отступ сверху */
+  bottom: auto !important;    /* отключаем старый bottom */
+  transform: none !important; /* убираем сдвиг по Y */
+}
+
+@media (max-width: 768px) {
+  .radial-menu {
+    left: max(8px, env(safe-area-inset-left, 0px)) !important;
+    top: max(72px, env(safe-area-inset-top, 0px) + 56px) !important;
+  }
+}
+
+@media (max-width: 480px) {
+  body {
+    font-size: 0.95rem;
+  }
+  .radial-menu {
+    left: 6px !important;
+    top: max(68px, env(safe-area-inset-top, 0px) + 52px) !important;
+  }
+}
