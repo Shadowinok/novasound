@@ -1,7 +1,7 @@
 .layout {
   position: relative;
   min-height: 100vh;
-  padding-bottom: 180px;
+  padding-bottom: clamp(100px, 22vw, 180px);
 }
 
 .header {
@@ -70,4 +70,46 @@
   max-width: 1200px;
   margin: 0 auto;
   padding: 24px 16px;
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 768px) {
+  .layout {
+    padding-bottom: clamp(88px, 28vw, 140px);
+  }
+  .header {
+    padding: 10px 12px;
+  }
+  .header-inner {
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    text-align: center;
+  }
+  .site-title {
+    font-size: clamp(1.1rem, 5vw, 1.5rem);
+    order: -1;
+    width: 100%;
+  }
+  .auth-links {
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .main {
+    padding: 14px 10px 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .layout {
+    padding-bottom: 84px;
+  }
+  .user-name {
+    font-size: 0.85rem;
+  }
+  .msk-clock {
+    font-size: 0.7rem;
+  }
 }

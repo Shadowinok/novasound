@@ -1,10 +1,34 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePlayer } from '../context/PlayerContext';
-import { getAudioUrl } from '../api/client';
 
 export default function PlayerBar() {
   const { currentTrack, playing, progress, duration, volume, togglePlay, seek, setPlayerVolume } = usePlayer();
+  const [volumeOpen, setVolumeOpen] = useState(false);
+  const volumeWrapRef = useRef(null);
+
+  useEffect(() => {
+    if (!volumeOpen) return;
+    const onDoc = (e) => {
+      if (volumeWrapRef.current && !volumeWrapRef.current.contains(e.target)) {
+        setVolumeOpen(false);
+      }
+    };
+    const onKey = (e) => {
+      if (e.key === 'Escape') setVolumeOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('touchstart', onDoc, { passive: true });
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('touchstart', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [volumeOpen]);
+
+  const volPct = Math.round((volume || 0) * 100);
+  const volumeIcon = volPct === 0 ? '🔇' : volPct < 40 ? '🔉' : '🔊';
 
   const formatTime = (s) => {
     if (!s || isNaN(s)) return '0:00';
@@ -55,16 +79,44 @@ export default function PlayerBar() {
           />
           <span className="player-time">{formatTime(duration)}</span>
         </div>
-        <div className="player-volume">
-          <span className="volume-label">🔊</span>
-          <input
-            type="range"
-            min={0}
-            max={100}
-            value={Math.round((volume || 0) * 100)}
-            onChange={(e) => setPlayerVolume(Number(e.target.value) / 100)}
-            className="player-slider volume-slider"
-          />
+        <div className="player-volume-wrap" ref={volumeWrapRef}>
+          <button
+            type="button"
+            className="volume-toggle"
+            aria-label="Громкость"
+            aria-expanded={volumeOpen}
+            aria-controls="player-volume-popover"
+            onClick={() => setVolumeOpen((v) => !v)}
+          >
+            <span className="volume-toggle-icon" aria-hidden>
+              {volumeIcon}
+            </span>
+          </button>
+          <AnimatePresence>
+            {volumeOpen && (
+              <motion.div
+                id="player-volume-popover"
+                className="volume-popover"
+                role="dialog"
+                aria-label="Уровень громкости"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                transition={{ duration: 0.15 }}
+              >
+                <span className="volume-popover-value">{volPct}%</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={volPct}
+                  onChange={(e) => setPlayerVolume(Number(e.target.value) / 100)}
+                  className="player-slider volume-slider"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
         <style>{`
           .player-bar {
@@ -112,13 +164,57 @@ export default function PlayerBar() {
             gap: 12px;
             max-width: 500px;
           }
-          .player-volume {
+          .player-volume-wrap {
+            position: relative;
+            flex-shrink: 0;
             display: flex;
             align-items: center;
-            gap: 8px;
-            min-width: 150px;
+            justify-content: flex-end;
           }
-          .volume-label { color: var(--text-dim); font-size: 0.9rem; }
+          .volume-toggle {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: 2px solid rgba(5, 217, 232, 0.45);
+            background: rgba(5, 217, 232, 0.1);
+            color: var(--neon-cyan);
+            font-size: 1.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            line-height: 1;
+            box-shadow: 0 0 12px rgba(5, 217, 232, 0.25);
+          }
+          .volume-toggle:hover,
+          .volume-toggle[aria-expanded="true"] {
+            background: rgba(5, 217, 232, 0.2);
+            border-color: var(--neon-cyan);
+          }
+          .volume-toggle-icon { pointer-events: none; }
+          .volume-popover {
+            position: absolute;
+            bottom: calc(100% + 10px);
+            right: 0;
+            left: auto;
+            z-index: 95;
+            min-width: 160px;
+            padding: 12px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-items: stretch;
+            background: rgba(12, 12, 22, 0.98);
+            border: 1px solid rgba(5, 217, 232, 0.35);
+            border-radius: 10px;
+            box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.45), 0 0 20px rgba(5, 217, 232, 0.12);
+          }
+          .volume-popover-value {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            text-align: center;
+            letter-spacing: 0.06em;
+          }
           .player-btn {
             width: 44px;
             height: 44px;
@@ -156,11 +252,36 @@ export default function PlayerBar() {
             box-shadow: 0 0 10px var(--neon-cyan);
             cursor: pointer;
           }
-          .volume-slider { max-width: 120px; }
+          .volume-slider { width: 100%; max-width: none; min-width: 120px; }
           @media (max-width: 900px) {
-            .player-bar { flex-wrap: wrap; gap: 12px; }
-            .player-controls { min-width: 100%; max-width: 100%; }
-            .player-volume { margin-left: auto; }
+            .player-bar {
+              flex-wrap: wrap;
+              gap: 10px;
+              padding: 10px 12px;
+              align-items: flex-start;
+            }
+            .player-info { min-width: 0; flex: 1 1 140px; }
+            .player-title { font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 42vw; }
+            .player-author { font-size: 0.72rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 42vw; }
+            .player-cover { width: 40px; height: 40px; flex-shrink: 0; }
+            .player-controls {
+              min-width: 100%;
+              max-width: 100%;
+              order: 3;
+              gap: 8px;
+            }
+            .player-volume-wrap { margin-left: auto; order: 2; align-self: center; }
+            .player-btn.play-pause { width: 40px; height: 40px; font-size: 1.05rem; }
+            .player-time { font-size: 0.78rem; min-width: 32px; }
+          }
+          @media (max-width: 480px) {
+            .player-bar { padding: 8px 10px; gap: 8px; }
+            .player-title, .player-author { max-width: 56vw; }
+            .volume-popover {
+              right: 0;
+              left: auto;
+              min-width: 140px;
+            }
           }
         `}</style>
       </motion.div>
