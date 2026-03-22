@@ -46,8 +46,13 @@ client.interceptors.request.use((config) => {
 client.interceptors.response.use(
   (r) => r,
   (err) => {
-    // Только 401 = «токен недействителен». 403 (email не подтверждён, не автор и т.д.) не чистим — иначе ломается UX и фоновые запросы.
-    if (err.response?.status === 401) {
+    const status = err.response?.status;
+    const url = String(err.config?.url || '');
+    const method = String(err.config?.method || '').toLowerCase();
+    // Неверный пароль при входе тоже 401 — не считаем это «протухшим токеном», не чистим хранилище здесь
+    const isFailedLogin = status === 401 && method === 'post' && url.includes('auth/login');
+    // Только 401 с других эндпоинтов = токен недействителен. 403 не чистим.
+    if (status === 401 && !isFailedLogin) {
       localStorage.removeItem('novasound_token');
       localStorage.removeItem('novasound_user');
       window.dispatchEvent(new Event('auth_logout'));
