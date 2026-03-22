@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { usePlayer } from '../context/PlayerContext';
 
 export default function PlayerBar() {
-  const { currentTrack, playing, progress, duration, volume, togglePlay, seek, setPlayerVolume } = usePlayer();
+  const { currentTrack, playing, progress, duration, volume, togglePlay, seek, setPlayerVolume, closePlayer } = usePlayer();
   const [volumeOpen, setVolumeOpen] = useState(false);
   const volumeWrapRef = useRef(null);
 
@@ -80,6 +80,18 @@ export default function PlayerBar() {
           <span className="player-time">{formatTime(duration)}</span>
         </div>
         <div className="player-volume-wrap" ref={volumeWrapRef}>
+          <button
+            type="button"
+            className="player-close"
+            aria-label="Закрыть плеер"
+            title="Закрыть плеер"
+            onClick={() => {
+              setVolumeOpen(false);
+              closePlayer();
+            }}
+          >
+            <span aria-hidden>✕</span>
+          </button>
           <button
             type="button"
             className="volume-toggle"
@@ -170,6 +182,28 @@ export default function PlayerBar() {
             display: flex;
             align-items: center;
             justify-content: flex-end;
+            gap: 8px;
+          }
+          .player-close {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-dim);
+            font-size: 1.1rem;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            cursor: pointer;
+            flex-shrink: 0;
+          }
+          .player-close:hover {
+            color: var(--neon-pink);
+            border-color: rgba(255, 42, 109, 0.5);
+            background: rgba(255, 42, 109, 0.12);
           }
           .volume-toggle {
             width: 44px;
