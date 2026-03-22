@@ -7,7 +7,7 @@ import { usePlayer } from '../context/PlayerContext';
 import { useAuth } from '../context/AuthContext';
 import client, { playlists as playlistsApi } from '../api/client';
 
-export default function TrackCard({ track, showStatus }) {
+export default function TrackCard({ track, showStatus, coverDisplayUrl, showPendingCoverBadge }) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { loadTrack, currentTrack, playing } = usePlayer();
@@ -17,6 +17,7 @@ export default function TrackCard({ track, showStatus }) {
   const [liked, setLiked] = useState(Array.isArray(track.likes) && user && track.likes.some((l) => l?.toString?.() === user.id || l === user.id));
   const [disliked, setDisliked] = useState(Array.isArray(track.dislikes) && user && track.dislikes.some((l) => l?.toString?.() === user.id || l === user.id));
   const [reportText, setReportText] = useState('');
+  const [reportKind, setReportKind] = useState('content'); // content | cover
   const [showReport, setShowReport] = useState(false);
   const [showPlaylist, setShowPlaylist] = useState(false);
   const [myPlaylists, setMyPlaylists] = useState([]);
@@ -93,10 +94,14 @@ export default function TrackCard({ track, showStatus }) {
       setActionMessage('Опишите проблему (минимум 10 символов)');
       return;
     }
-    client.post(`/tracks/${track._id}/report`, { text: reportText.trim() })
+    client.post(`/tracks/${track._id}/report`, {
+      text: reportText.trim(),
+      reportType: reportKind === 'cover' ? 'cover' : 'content'
+    })
       .then((r) => {
         setShowReport(false);
         setReportText('');
+        setReportKind('content');
         setActionMessage(r.data?.message || 'Жалоба отправлена');
       })
       .catch((e) => setActionMessage(e.response?.data?.message || 'Не удалось отправить жалобу'));
@@ -112,8 +117,15 @@ export default function TrackCard({ track, showStatus }) {
       <Link to={`/track/${track._id}`} className="track-card-link">
         <div
           className="track-cover"
-          style={{ backgroundImage: track.coverImage ? `url(${track.coverImage})` : 'linear-gradient(135deg, var(--neon-purple), var(--neon-pink))' }}
+          style={{
+            backgroundImage: (coverDisplayUrl || track.coverImage)
+              ? `url(${coverDisplayUrl || track.coverImage})`
+              : 'linear-gradient(135deg, var(--neon-purple), var(--neon-pink))'
+          }}
         >
+          {showPendingCoverBadge && (
+            <span className="track-cover-pending-badge">Обложка на модерации</span>
+          )}
           <button type="button" className="track-play-btn" onClick={handlePlay} title={user ? 'Слушать' : 'Войдите, чтобы слушать'}>
             {!user ? '🔒' : isCurrent && playing ? '⏸' : '▶'}
           </button>
@@ -140,7 +152,28 @@ export default function TrackCard({ track, showStatus }) {
       {showReport && createPortal((
         <div className="card-overlay" onClick={() => setShowReport(false)}>
           <div className="card-modal" onClick={(e) => e.stopPropagation()}>
-            <h4>Жалоба на трек</h4>
+            <h4>Жалоба</h4>
+            <div className="report-kind-row">
+              <label className="report-kind">
+                <input
+                  type="radio"
+                  name="repKind"
+                  checked={reportKind === 'content'}
+                  onChange={() => setReportKind('content')}
+                />
+                На трек / описание
+              </label>
+              <label className="report-kind">
+                <input
+                  type="radio"
+                  name="repKind"
+                  checked={reportKind === 'cover'}
+                  onChange={() => setReportKind('cover')}
+                  disabled={!track.coverImage}
+                />
+                На обложку
+              </label>
+            </div>
             <textarea
               className="card-textarea"
               rows={4}
@@ -202,6 +235,28 @@ export default function TrackCard({ track, showStatus }) {
           justify-content: center;
           position: relative;
         }
+        .track-cover-pending-badge {
+          position: absolute;
+          bottom: 6px;
+          left: 6px;
+          right: 6px;
+          text-align: center;
+          font-size: 0.65rem;
+          padding: 4px 6px;
+          border-radius: 6px;
+          background: rgba(0,0,0,0.75);
+          color: #ffc800;
+          pointer-events: none;
+        }
+        .report-kind-row {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          margin-bottom: 8px;
+          font-size: 0.85rem;
+          color: var(--text-dim);
+        }
+        .report-kind { display: flex; align-items: center; gap: 8px; cursor: pointer; }
         .track-play-btn {
           width: 56px;
           height: 56px;
