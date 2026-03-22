@@ -32,7 +32,8 @@ export default client;
 export const auth = {
   register: (data) => client.post('/auth/register', data),
   login: (data) => client.post('/auth/login', data),
-  me: () => client.get('/auth/me')
+  me: () => client.get('/auth/me'),
+  resendVerification: (email) => client.post('/auth/resend-verification', { email })
 };
 
 export const users = {
@@ -92,7 +93,8 @@ export const tracks = {
   delete: (id) => client.delete(`/tracks/${id}`),
   play: (id) => client.post(`/tracks/${id}/play`),
   like: (id) => client.post(`/tracks/${id}/like`),
-  report: (id, text) => client.post(`/tracks/${id}/report`, { text })
+  report: (id, text, reportType) =>
+    client.post(`/tracks/${id}/report`, { text, ...(reportType ? { reportType } : {}) })
 };
 
 export const charts = {
@@ -120,6 +122,9 @@ export const admin = {
   users: () => client.get('/admin/users'),
   deleteUser: (id, reason) => client.delete(`/admin/users/${id}`, { data: { reason } }),
   pendingTracks: () => client.get('/admin/tracks/pending'),
+  coverPending: () => client.get('/admin/tracks/cover-pending'),
+  approveCover: (id) => client.put(`/admin/tracks/${id}/cover/approve`),
+  rejectCoverModeration: (id, comment) => client.put(`/admin/tracks/${id}/cover/reject`, { comment }),
   approveTrack: (id, comment) => client.put(`/admin/tracks/${id}/approve`, { comment }),
   rejectTrack: (id, comment) => client.put(`/admin/tracks/${id}/reject`, { comment }),
   trackReports: (status) => client.get('/admin/track-reports', { params: { status: status || 'open' } }),
