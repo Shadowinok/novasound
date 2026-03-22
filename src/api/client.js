@@ -80,16 +80,17 @@ export const tracks = {
   my: (params) => client.get('/tracks/my', { params }),
   myReports: () => client.get('/tracks/my/reports'),
   create: (formData) => client.post('/tracks', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
-  createWithProgress: (formData, onProgress) => client.post('/tracks', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-    onUploadProgress: (evt) => {
-      if (!onProgress) return;
-      const total = evt.total || 0;
-      const loaded = evt.loaded || 0;
-      const pct = total ? Math.round((loaded / total) * 100) : 0;
-      onProgress({ loaded, total, pct });
-    }
-  }),
+  createWithProgress: (formData, onProgress) =>
+    client.post('/tracks', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress: (evt) => {
+        if (!onProgress) return;
+        const total = evt.total || 0;
+        const loaded = evt.loaded || 0;
+        const pct = total ? Math.round((loaded / total) * 100) : 0;
+        onProgress({ loaded, total, pct });
+      }
+    }),
   update: (id, data) => client.put(`/tracks/${id}`, data),
   /**
    * Смена обложки: XMLHttpRequest + FormData (надёжнее fetch для multipart), не axios JSON.
