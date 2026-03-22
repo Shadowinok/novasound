@@ -20,9 +20,10 @@ export default function Home() {
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="page home">
       <section className="hero">
         <h2 className="hero-title">AI Music</h2>
-        <p className="hero-sub">
-          Площадка про нейросети и музыку: слушай, загружай, смотри чарты.
-        </p>
+        <div className="hero-sub" aria-label="Описание площадки">
+          <span className="hero-sub-line hero-sub-line--lead">Площадка про нейросети и музыку</span>
+          <span className="hero-sub-line">слушай, загружай, смотри чарты</span>
+        </div>
       </section>
       {popular.length > 0 && (
         <section>
@@ -81,12 +82,27 @@ export default function Home() {
           margin-bottom: 8px;
         }
         .hero-sub {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+          max-width: 560px;
+          margin: 12px auto 0;
+          padding: 0 12px;
+        }
+        .hero-sub-line {
+          display: block;
+          width: 100%;
+          text-align: center;
           color: rgba(165, 235, 248, 0.95);
           font-size: 1.05rem;
-          line-height: 1.5;
-          max-width: 520px;
-          margin: 0 auto;
+          line-height: 1.45;
           text-shadow: 0 0 24px rgba(5, 217, 232, 0.18);
+        }
+        .hero-sub-line--lead {
+          font-weight: 600;
+          letter-spacing: 0.02em;
         }
         .section-title {
           font-size: 1.3rem;
