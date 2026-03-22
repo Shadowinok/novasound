@@ -74,21 +74,25 @@ export default function Home() {
           margin-bottom: 40px;
         }
         .hero-title {
-          font-size: 2.5rem;
+          font-family: var(--font-display);
+          font-size: clamp(2.75rem, 7.5vw, 3.35rem);
+          font-weight: 700;
+          letter-spacing: 0.07em;
+          text-transform: none;
           background: linear-gradient(90deg, var(--neon-pink), var(--neon-cyan));
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           background-clip: text;
-          margin-bottom: 8px;
+          margin: 0 auto 12px;
         }
         .hero-sub {
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          gap: 10px;
+          gap: 8px;
           max-width: 560px;
-          margin: 12px auto 0;
+          margin: 0 auto;
           padding: 0 12px;
         }
         .hero-sub-line {
@@ -96,13 +100,13 @@ export default function Home() {
           width: 100%;
           text-align: center;
           color: rgba(165, 235, 248, 0.95);
-          font-size: 1.05rem;
-          line-height: 1.45;
+          font-size: 1.1rem;
+          line-height: 1.5;
+          font-weight: 400;
           text-shadow: 0 0 24px rgba(5, 217, 232, 0.18);
         }
         .hero-sub-line--lead {
           font-weight: 600;
-          letter-spacing: 0.02em;
         }
         .section-title {
           font-size: 1.3rem;
