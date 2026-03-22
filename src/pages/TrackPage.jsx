@@ -36,7 +36,9 @@ export default function TrackPage() {
       .finally(() => setLoading(false));
   }, [id, user?.id]);
 
-  const handlePlay = () => {
+  const handlePlay = (e) => {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
     if (!user) {
       navigate('/login');
       return;
