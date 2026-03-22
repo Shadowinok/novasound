@@ -74,6 +74,28 @@
   min-width: 0;
 }
 
+.site-footer {
+  position: relative;
+  z-index: 6;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 8px 16px 100px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 20px;
+  font-size: 0.88rem;
+}
+.site-footer a {
+  color: var(--text-dim);
+  text-decoration: none;
+  letter-spacing: 0.04em;
+}
+.site-footer a:hover {
+  color: var(--neon-cyan);
+  text-shadow: 0 0 10px rgba(5, 217, 232, 0.35);
+}
+
 @media (max-width: 768px) {
   .layout {
     padding-bottom: clamp(88px, 28vw, 140px);

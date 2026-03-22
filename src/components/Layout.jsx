@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import ParticleBackground from './ParticleBackground';
 import RadialMenu from './RadialMenu';
@@ -49,6 +49,11 @@ export default function Layout() {
       <main className="main">
         <Outlet />
       </main>
+      <footer className="site-footer">
+        <Link to="/about">О проекте</Link>
+        <Link to="/radio">Радио</Link>
+        <Link to="/terms">Правила</Link>
+      </footer>
       <RadialMenu user={user} isAdmin={isAdmin} />
       <PlayerBar />
     </div>
