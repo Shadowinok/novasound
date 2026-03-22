@@ -25,7 +25,10 @@ export default function Profile() {
   const [coverUploading, setCoverUploading] = useState(false);
   const [coverError, setCoverError] = useState('');
   const [coverOk, setCoverOk] = useState(false);
+  const [coverInfo, setCoverInfo] = useState('');
   const coverInputRef = useRef(null);
+  /** Синхронный id трека для обложки — иначе React state не успевает до onChange файла */
+  const pendingCoverTrackIdRef = useRef(null);
 
   const fetchMyTracks = () => {
     setLoading(true);
@@ -105,7 +108,9 @@ export default function Profile() {
 
   const openCoverPicker = (trackId) => {
     setCoverError('');
+    setCoverInfo('');
     setCoverOk(false);
+    pendingCoverTrackIdRef.current = trackId;
     setCoverTrackId(trackId);
     if (coverInputRef.current) coverInputRef.current.value = '';
     coverInputRef.current?.click();
@@ -113,13 +118,19 @@ export default function Profile() {
 
   const handleCoverFile = (e) => {
     const file = e.target.files?.[0];
-    if (!file || !coverTrackId) return;
+    const trackIdForCover = pendingCoverTrackIdRef.current || coverTrackId;
+    if (!file) return;
+    if (!trackIdForCover) {
+      setCoverError('Сбой выбора трека — нажмите «Сменить обложку» ещё раз');
+      return;
+    }
     const fd = new FormData();
     fd.append('cover', file);
     setCoverUploading(true);
     setCoverError('');
+    setCoverInfo('');
     setCoverOk(false);
-    tracksApi.updateCover(coverTrackId, fd)
+    tracksApi.updateCover(trackIdForCover, fd)
       .then((r) => {
         const u = r?.data;
         if (u && u._id) {
@@ -128,7 +139,15 @@ export default function Profile() {
           );
           window.dispatchEvent(new CustomEvent('novasound_track_cover', { detail: { track: u } }));
         }
-        setCoverOk(true);
+        if (u?.coverChangeStatus === 'pending' && u?.coverImagePending) {
+          setCoverInfo(
+            'Новая обложка на модерации. После одобрения админом появится везде. В каталоге пока старая картинка.'
+          );
+          setCoverOk(false);
+        } else {
+          setCoverInfo('');
+          setCoverOk(true);
+        }
         fetchMyTracks();
       })
       .catch((err) => {
@@ -144,6 +163,7 @@ export default function Profile() {
       })
       .finally(() => {
         setCoverUploading(false);
+        pendingCoverTrackIdRef.current = null;
         setCoverTrackId('');
         e.target.value = '';
       });
@@ -160,6 +180,7 @@ export default function Profile() {
         onChange={handleCoverFile}
       />
       {coverOk && <div className="profile-cover-ok">Обложка обновлена</div>}
+      {coverInfo && <div className="profile-cover-info">{coverInfo}</div>}
       {coverError && <div className="profile-cover-error">{coverError}</div>}
       <div className="profile-toolbar">
         <select
@@ -338,6 +359,7 @@ export default function Profile() {
         .neon-btn:hover { background: rgba(5, 217, 232, 0.2); }
         .profile-cover-input { position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none; }
         .profile-cover-ok { color: #69db7c; margin-bottom: 12px; }
+        .profile-cover-info { color: #ffc800; margin-bottom: 12px; max-width: 560px; line-height: 1.4; }
         .profile-cover-error { color: #ff6b6b; margin-bottom: 12px; }
         .logout-btn {
           appearance: none;
