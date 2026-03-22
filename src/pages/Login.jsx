@@ -22,12 +22,19 @@ export default function Login() {
         navigate('/');
       })
       .catch((err) => {
+        const status = err.response?.status;
         const d = err.response?.data;
-        if (err.response?.status === 403 && d?.needsVerification && d?.email) {
+        if (status === 403 && d?.needsVerification && d?.email) {
           navigate('/register/check-email', { state: { email: d.email } });
           return;
         }
-        setError(d?.message || 'Ошибка входа');
+        const fromValidation = Array.isArray(d?.errors) && d.errors[0]?.msg;
+        const msg =
+          (typeof d?.message === 'string' && d.message.trim()) ||
+          fromValidation ||
+          (status === 401 ? 'Неверный логин или пароль. Проверьте email и пароль.' : '') ||
+          'Ошибка входа';
+        setError(msg);
       })
       .finally(() => setLoading(false));
   };
