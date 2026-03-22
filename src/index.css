@@ -68,3 +68,20 @@ h1, h2, h3 {
   bottom: auto !important;    /* отключаем старый bottom */
   transform: none !important; /* убираем сдвиг по Y */
 }
+
+@media (max-width: 768px) {
+  .radial-menu {
+    left: max(8px, env(safe-area-inset-left, 0px)) !important;
+    top: max(72px, env(safe-area-inset-top, 0px) + 56px) !important;
+  }
+}
+
+@media (max-width: 480px) {
+  body {
+    font-size: 0.95rem;
+  }
+  .radial-menu {
+    left: 6px !important;
+    top: max(68px, env(safe-area-inset-top, 0px) + 52px) !important;
+  }
+}
