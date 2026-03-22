@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { tracks as tracksApi } from '../api/client';
 
@@ -30,7 +31,10 @@ export default function UploadTrack({ onClose, onSuccess }) {
     formData.append('audio', audioFile);
     if (coverFile) formData.append('cover', coverFile);
     tracksApi.createWithProgress(formData, ({ pct }) => setProgress(pct))
-      .then(() => onSuccess())
+      .then((res) => {
+        const track = res?.data;
+        if (typeof onSuccess === 'function') onSuccess(track);
+      })
       .catch((err) => {
         const validationMessage = err.response?.data?.errors?.[0]?.msg;
         const apiMessage = err.response?.data?.message;
@@ -69,6 +73,12 @@ export default function UploadTrack({ onClose, onSuccess }) {
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="upload-title">Загрузить трек</h3>
+        <p className="upload-disclaimer">
+          Загружая файл, вы подтверждаете соблюдение{' '}
+          <Link to="/terms" onClick={(e) => e.stopPropagation()}>правил сервиса</Link>.
+          Название и описание проверяются автоматически; <strong>содержимое аудио и пиксели обложки</strong> без
+          платных API мы не анализируем — возможны жалобы пользователей и решение модератора.
+        </p>
         <form onSubmit={handleSubmit}>
           <input
             type="text"
@@ -134,7 +144,18 @@ export default function UploadTrack({ onClose, onSuccess }) {
           width: 100%;
           box-shadow: 0 0 50px rgba(5, 217, 232, 0.2);
         }
-        .upload-title { color: var(--neon-cyan); margin-bottom: 20px; }
+        .upload-title { color: var(--neon-cyan); margin-bottom: 12px; }
+        .upload-disclaimer {
+          font-size: 0.82rem;
+          line-height: 1.45;
+          color: var(--text-dim);
+          margin-bottom: 16px;
+          padding: 10px 12px;
+          border-radius: 8px;
+          background: rgba(5, 217, 232, 0.06);
+          border: 1px solid rgba(5, 217, 232, 0.2);
+        }
+        .upload-disclaimer a { color: var(--neon-cyan); }
         .upload-input, .upload-file {
           width: 100%;
           padding: 10px 14px;
