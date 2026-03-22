@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import client from '../api/client';
 import { admin as adminApi } from '../api/client';
-import UploadTrack from '../components/UploadTrack';
 import TrackCard from '../components/TrackCard';
 
 export default function Admin() {
@@ -127,7 +126,7 @@ export default function Admin() {
       </div>
       {tab === 'covers' && (
         <>
-          <p className="admin-hint">Обложки после проверки ИИ по имени файла (подозрительные — на ручную проверку).</p>
+          <p className="admin-hint">Обложки с подозрительным именем файла (эвристика) — на ручную проверку.</p>
           {adminMessage && <div className="admin-message">{adminMessage}</div>}
           <input
             type="text"
@@ -173,7 +172,11 @@ export default function Admin() {
             <div className="admin-pending-grid">
               {pending.map((track) => (
                 <motion.div key={track._id} className="admin-card" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-                  <TrackCard track={track} showStatus />
+                  <TrackCard
+                    track={track}
+                    showStatus
+                    coverDisplayUrl={track.coverImagePending || track.coverImage}
+                  />
                   <div className="admin-card-actions">
                     <button type="button" className="admin-btn approve" onClick={() => handleApprove(track._id)}>Одобрить</button>
                     <button type="button" className="admin-btn reject" onClick={() => handleReject(track._id)}>Отклонить</button>

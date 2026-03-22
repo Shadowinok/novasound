@@ -26,6 +26,7 @@ export default function Profile() {
   const [coverError, setCoverError] = useState('');
   const [coverOk, setCoverOk] = useState(false);
   const [coverInfo, setCoverInfo] = useState('');
+  const [uploadNotice, setUploadNotice] = useState('');
   const coverInputRef = useRef(null);
   /** Синхронный id трека для обложки — иначе React state не успевает до onChange файла */
   const pendingCoverTrackIdRef = useRef(null);
@@ -54,6 +55,12 @@ export default function Profile() {
     const t = setTimeout(() => setCoverOk(false), 4000);
     return () => clearTimeout(t);
   }, [coverOk]);
+
+  useEffect(() => {
+    if (!uploadNotice) return undefined;
+    const t = setTimeout(() => setUploadNotice(''), 14000);
+    return () => clearTimeout(t);
+  }, [uploadNotice]);
 
   const stats = useMemo(() => {
     const list = Array.isArray(tracks) ? tracks : [];
@@ -180,6 +187,7 @@ export default function Profile() {
         onChange={handleCoverFile}
       />
       {coverOk && <div className="profile-cover-ok">Обложка обновлена</div>}
+      {uploadNotice && <div className="profile-cover-info">{uploadNotice}</div>}
       {coverInfo && <div className="profile-cover-info">{coverInfo}</div>}
       {coverError && <div className="profile-cover-error">{coverError}</div>}
       <div className="profile-toolbar">
@@ -257,7 +265,19 @@ export default function Profile() {
       {showUpload && (
         <UploadTrack
           onClose={() => setShowUpload(false)}
-          onSuccess={() => { setShowUpload(false); fetchMyTracks(); }}
+          onSuccess={(track) => {
+            setShowUpload(false);
+            fetchMyTracks();
+            if (track?.status === 'approved') {
+              setUploadNotice('Трек опубликован в каталоге.');
+            } else if (track?.status === 'pending') {
+              setUploadNotice(
+                `Трек на модерации.${track.moderationComment ? ` ${track.moderationComment}` : ' Администратор проверит публикацию вручную.'}`
+              );
+            } else {
+              setUploadNotice('Трек сохранён.');
+            }
+          }}
         />
       )}
       {showDanger && (
