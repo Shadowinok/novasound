@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useRef, useCallback, useEffect } from 'react';
-import { Howl } from 'howler';
+import { Howl, Howler } from 'howler';
+
+Howler.autoUnlock = true;
 import { tracks as tracksApi, getAudioUrl } from '../api/client';
 
 const PlayerContext = createContext(null);
@@ -43,8 +45,7 @@ export function PlayerProvider({ children }) {
         setProgress(0);
       },
       onplay: () => setPlaying(true),
-      onpause: () => setPlaying(false),
-      xhrWithCredentials: true
+      onpause: () => setPlaying(false)
     });
     howlRef.current = howl;
     setCurrentTrack(track);
@@ -53,7 +54,7 @@ export function PlayerProvider({ children }) {
     setPlaying(true);
     howl.play();
     tracksApi.play(track._id).catch(() => {});
-  }, []);
+  }, [volume]);
 
   useEffect(() => {
     const clearPlayer = () => {
@@ -106,13 +107,19 @@ export function PlayerProvider({ children }) {
     setProgress(value);
   }, []);
 
+  // Только currentTrack — иначе при паузе/плей эффект пересоздаётся и на части браузеров глючит HTML5 Audio
   useEffect(() => {
     const howl = howlRef.current;
     if (!howl) return;
-    const tick = () => setProgress(howl.seek());
+    const tick = () => {
+      const h = howlRef.current;
+      if (!h) return;
+      const pos = h.seek();
+      if (typeof pos === 'number' && !Number.isNaN(pos)) setProgress(pos);
+    };
     const id = setInterval(tick, 500);
     return () => clearInterval(id);
-  }, [currentTrack, playing]);
+  }, [currentTrack]);
 
   return (
     <PlayerContext.Provider value={{
