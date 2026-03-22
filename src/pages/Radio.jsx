@@ -8,8 +8,10 @@ import { motion } from 'framer-motion';
 export default function Radio() {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="page radio-page">
-      <h1 className="page-title">NovaSound Radio</h1>
-      <p className="radio-tagline">Интернет-станция про ИИ и музыку — в разработке</p>
+      <header className="radio-header">
+        <h1 className="page-title radio-main-title">NovaSound Radio</h1>
+        <p className="radio-tagline">Интернет-станция про ИИ и музыку — в разработке</p>
+      </header>
 
       <div className="radio-body">
         <section className="radio-block radio-now">
@@ -18,24 +20,6 @@ export default function Radio() {
             Потокового эфира и круглосуточного «ведущего» пока нет — зато уже работают{' '}
             <Link to="/catalog">каталог</Link>, <Link to="/charts">чарты</Link> и{' '}
             <Link to="/playlists">плейлисты</Link>. Их можно слушать как основу будущей сетки вещания.
-          </p>
-        </section>
-
-        <section className="radio-block">
-          <h2>Ближайший шаг (этап 0)</h2>
-          <ul>
-            <li>один управляемый поток или плейлист с ротацией одобренных треков;</li>
-            <li>короткие джинглы или заранее записанные / TTS-фразы — без часов импровизации;</li>
-            <li>новости и погода не автоматом из сети без фильтров — сначала ручной или шаблонный контроль;</li>
-            <li>упоминания чартов NovaSound — только из вашей базы, без выдуманных цифр.</li>
-          </ul>
-        </section>
-
-        <section className="radio-block">
-          <h2>Потом</h2>
-          <p>
-            Расписание слотов, whitelist источников для новостей (ИИ + музыка, без политики), интеграция с чартами для
-            коротких голосовых вставок — как в нашем плане в репозитории.
           </p>
         </section>
 
@@ -48,11 +32,19 @@ export default function Radio() {
 
       <style>{`
         .radio-page { padding-bottom: 48px; }
+        .radio-header {
+          text-align: center;
+          margin-bottom: 8px;
+        }
+        .radio-main-title {
+          width: 100%;
+          text-align: center;
+        }
         .radio-tagline {
           text-align: center;
           color: var(--neon-cyan);
           font-size: 1rem;
-          margin: -8px 0 24px;
+          margin: 8px 0 24px;
           letter-spacing: 0.04em;
         }
         .radio-body {

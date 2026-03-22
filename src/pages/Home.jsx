@@ -21,10 +21,7 @@ export default function Home() {
       <section className="hero">
         <h2 className="hero-title">AI Music</h2>
         <p className="hero-sub">
-          Площадка про нейросети и музыку: слушай, загружай, смотри чарты —{' '}
-          <Link to="/about" className="hero-link">о посыле проекта</Link>
-          {' '}и{' '}
-          <Link to="/radio" className="hero-link">будущем радио</Link>.
+          Площадка про нейросети и музыку: слушай, загружай, смотри чарты.
         </p>
       </section>
       {popular.length > 0 && (
@@ -83,13 +80,14 @@ export default function Home() {
           background-clip: text;
           margin-bottom: 8px;
         }
-        .hero-sub { color: var(--text-dim); font-size: 1.05rem; line-height: 1.5; max-width: 520px; margin: 0 auto; }
-        .hero-link {
-          color: var(--neon-pink);
-          text-decoration: none;
-          border-bottom: 1px solid rgba(255, 42, 109, 0.4);
+        .hero-sub {
+          color: rgba(165, 235, 248, 0.95);
+          font-size: 1.05rem;
+          line-height: 1.5;
+          max-width: 520px;
+          margin: 0 auto;
+          text-shadow: 0 0 24px rgba(5, 217, 232, 0.18);
         }
-        .hero-link:hover { text-shadow: 0 0 14px rgba(255, 42, 109, 0.35); }
         .section-title {
           font-size: 1.3rem;
           color: var(--neon-cyan);

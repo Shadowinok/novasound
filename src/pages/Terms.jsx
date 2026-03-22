@@ -3,8 +3,8 @@ import { motion } from 'framer-motion';
 
 export default function Terms() {
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="page">
-      <h1 className="page-title">Правила сервиса NovaSound</h1>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="page page-terms">
+      <h1 className="page-title terms-main-title">Правила сервиса NovaSound</h1>
       <div className="terms-body">
         <h2>1. Общие положения</h2>
         <p>
@@ -56,6 +56,11 @@ export default function Terms() {
         </p>
       </div>
       <style>{`
+        .terms-main-title {
+          text-align: center;
+          width: 100%;
+          display: block;
+        }
         .terms-body {
           max-width: 900px;
           margin: 0 auto;
