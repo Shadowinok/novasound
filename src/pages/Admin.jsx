@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import client from '../api/client';
 import { admin as adminApi } from '../api/client';
@@ -19,6 +19,7 @@ export default function Admin() {
   const [adminComments, setAdminComments] = useState({});
   const [loading, setLoading] = useState(true);
   const [pendingCovers, setPendingCovers] = useState([]);
+  const [userSearch, setUserSearch] = useState('');
 
   const fetchPending = () => {
     adminApi.pendingTracks().then((r) => setPending(r.data || [])).catch(() => setPending([]));
@@ -114,6 +115,17 @@ export default function Admin() {
       .finally(() => setResolvingReportId(''));
   };
 
+  const filteredUsers = useMemo(() => {
+    const list = Array.isArray(users) ? users : [];
+    const q = userSearch.trim().toLowerCase();
+    if (!q) return list;
+    return list.filter((u) => {
+      const name = String(u.username || '').toLowerCase();
+      const mail = String(u.email || '').toLowerCase();
+      return name.includes(q) || mail.includes(q);
+    });
+  }, [users, userSearch]);
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="page admin-page">
       <h2 className="page-title">Админ-панель</h2>
@@ -203,6 +215,15 @@ export default function Admin() {
         <div className="admin-users">
           <p className="admin-hint">Удаление аккаунтов пользователей администратором.</p>
           <input
+            type="search"
+            value={userSearch}
+            onChange={(e) => setUserSearch(e.target.value)}
+            className="admin-comment-input admin-user-search"
+            placeholder="Поиск по имени или email…"
+            autoComplete="off"
+            aria-label="Поиск пользователя"
+          />
+          <input
             type="text"
             value={userReason}
             onChange={(e) => setUserReason(e.target.value)}
@@ -214,8 +235,15 @@ export default function Admin() {
             <div className="loading">Загрузка...</div>
           ) : users.length === 0 ? (
             <div className="empty">Пользователей пока нет</div>
+          ) : filteredUsers.length === 0 ? (
+            <div className="empty">Никого не найдено по запросу «{userSearch.trim()}»</div>
           ) : (
             <div className="users-table-wrap">
+              <p className="admin-user-count">
+                {userSearch.trim()
+                  ? `Найдено: ${filteredUsers.length} из ${users.length}`
+                  : `Всего: ${users.length}`}
+              </p>
               <table className="users-table">
                 <thead>
                   <tr>
@@ -228,7 +256,7 @@ export default function Admin() {
                   </tr>
                 </thead>
                 <tbody>
-                  {users.map((u) => (
+                  {filteredUsers.map((u) => (
                     <tr key={u._id}>
                       <td>{u.username}</td>
                       <td>{u.email}</td>
@@ -367,6 +395,8 @@ export default function Admin() {
           background: rgba(0,0,0,0.3);
           color: var(--text);
         }
+        .admin-user-search { margin-bottom: 12px; max-width: 420px; }
+        .admin-user-count { font-size: 0.85rem; color: var(--text-dim); margin: 0 0 10px 0; }
         .admin-pending-grid {
           display: grid;
           grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
