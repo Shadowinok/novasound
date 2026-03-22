@@ -1,7 +1,35 @@
 import axios from 'axios';
 
-const API_BASE = import.meta.env.VITE_API_URL
-  || (import.meta.env.DEV ? '/api' : 'https://novasound-api.onrender.com/api');
+/**
+ * База API. На Vercel (и dev) — относительный /api → тот же origin, прокси в vercel.json, без CORS к Render.
+ * На REG.RU и т.д. — только абсолютный URL (Render). Важно: если в билде VITE_API_URL=/api для Vercel,
+ * на REG.RU нельзя использовать относительный путь — статика не проксирует /api, смена обложки и логин ломаются.
+ */
+function getApiBase() {
+  // В index.html можно задать без пересборки: window.NOVASOUND_API_BASE = 'https://.../api'
+  if (typeof window !== 'undefined' && window.NOVASOUND_API_BASE) {
+    return String(window.NOVASOUND_API_BASE).replace(/\/$/, '');
+  }
+  if (typeof window !== 'undefined') {
+    const h = window.location.hostname;
+    if (h.endsWith('.vercel.app') || h === 'localhost' || h === '127.0.0.1') {
+      return '/api';
+    }
+  }
+  const env = import.meta.env.VITE_API_URL;
+  const envStr = env !== undefined && env !== null ? String(env).trim() : '';
+  // Абсолютный URL из env — подходит для любого домена (в т.ч. свой домен на Vercel + CORS на Render).
+  if (envStr && !envStr.startsWith('/')) {
+    return envStr.replace(/\/$/, '');
+  }
+  // Относительный /api из .env здесь не применяем: без прокси (REG.RU) он ведёт на 404 у хостинга.
+  if (typeof window === 'undefined') {
+    return import.meta.env.DEV ? '/api' : 'https://novasound-api.onrender.com/api';
+  }
+  return 'https://novasound-api.onrender.com/api';
+}
+
+const API_BASE = getApiBase();
 const API_ORIGIN = API_BASE.endsWith('/api') ? API_BASE.slice(0, -4) : API_BASE;
 
 const client = axios.create({
@@ -18,7 +46,8 @@ client.interceptors.request.use((config) => {
 client.interceptors.response.use(
   (r) => r,
   (err) => {
-    if (err.response?.status === 401 || err.response?.status === 403) {
+    // Только 401 = «токен недействителен». 403 (email не подтверждён, не автор и т.д.) не чистим — иначе ломается UX и фоновые запросы.
+    if (err.response?.status === 401) {
       localStorage.removeItem('novasound_token');
       localStorage.removeItem('novasound_user');
       window.dispatchEvent(new Event('auth_logout'));
@@ -58,34 +87,43 @@ export const tracks = {
   }),
   update: (id, data) => client.put(`/tracks/${id}`, data),
   /**
-   * Смена обложки: через fetch, не axios — у axios с default JSON FormData ломается
-   * (тело уходит не multipart / без boundary), сервер не видит файл.
+   * Смена обложки: XMLHttpRequest + FormData (надёжнее fetch для multipart), не axios JSON.
+   * URL через getApiBase() — на Vercel запрос идёт на /api (прокси), без CORS к Render.
    */
   updateCover: async (id, formData) => {
     const idStr = String(id ?? '').trim();
     const token = typeof localStorage !== 'undefined' ? localStorage.getItem('novasound_token') : null;
-    const url = `${API_BASE.replace(/\/$/, '')}/tracks/${encodeURIComponent(idStr)}/cover`;
-    const res = await fetch(url, {
-      method: 'PUT',
-      headers: {
-        ...(token ? { Authorization: `Bearer ${token}` } : {})
-      },
-      body: formData
+    const base = getApiBase().replace(/\/$/, '');
+    const path = `/tracks/${encodeURIComponent(idStr)}/cover`;
+    const url = `${base}${path}`;
+
+    const { status, data } = await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      // POST: часть CDN/прокси (в т.ч. Vercel edge) криво прокидывает PUT + multipart; на бэке дублирует PUT
+      xhr.open('POST', url, true);
+      if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      xhr.onload = () => {
+        let parsed = {};
+        try {
+          parsed = xhr.responseText ? JSON.parse(xhr.responseText) : {};
+        } catch (_) {
+          parsed = { message: xhr.status >= 400 ? `Ошибка сервера (${xhr.status})` : '' };
+        }
+        resolve({ status: xhr.status, data: parsed });
+      };
+      xhr.onerror = () =>
+        reject(new Error('Нет связи с сервером (сеть/CORS). На своём домене добавь CORS_EXTRA_ORIGINS на Render.'));
+      xhr.send(formData);
     });
-    let data = {};
-    try {
-      data = await res.json();
-    } catch (_) {
-      data = {};
-    }
-    if (res.status === 401 || res.status === 403) {
+
+    if (status === 401) {
       localStorage.removeItem('novasound_token');
       localStorage.removeItem('novasound_user');
       window.dispatchEvent(new Event('auth_logout'));
     }
-    if (!res.ok) {
+    if (status < 200 || status >= 300) {
       const err = new Error(data.message || 'Не удалось загрузить обложку');
-      err.response = { status: res.status, data };
+      err.response = { status, data };
       throw err;
     }
     return { data };
