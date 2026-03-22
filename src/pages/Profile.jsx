@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import client, { tracks as tracksApi, users as usersApi } from '../api/client';
+import client, { tracks as tracksApi, users as usersApi, playlists as playlistsApi } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import TrackCard from '../components/TrackCard';
 import UploadTrack from '../components/UploadTrack';
@@ -27,6 +27,13 @@ export default function Profile() {
   const [coverOk, setCoverOk] = useState(false);
   const [coverInfo, setCoverInfo] = useState('');
   const [uploadNotice, setUploadNotice] = useState('');
+  const [myPlaylists, setMyPlaylists] = useState([]);
+  const [playlistsLoading, setPlaylistsLoading] = useState(true);
+  const [newPlaylistTitle, setNewPlaylistTitle] = useState('');
+  const [newPlaylistPublic, setNewPlaylistPublic] = useState(false);
+  const [playlistFlash, setPlaylistFlash] = useState('');
+  const [deletingPlaylistId, setDeletingPlaylistId] = useState('');
+  const [togglingPlaylistId, setTogglingPlaylistId] = useState('');
   const coverInputRef = useRef(null);
   /** Синхронный id трека для обложки — иначе React state не успевает до onChange файла */
   const pendingCoverTrackIdRef = useRef(null);
@@ -45,10 +52,23 @@ export default function Profile() {
       .catch(() => setReports([]));
   };
 
+  const fetchMyPlaylists = () => {
+    setPlaylistsLoading(true);
+    playlistsApi
+      .myList()
+      .then((r) => setMyPlaylists(r.data || []))
+      .catch(() => setMyPlaylists([]))
+      .finally(() => setPlaylistsLoading(false));
+  };
+
   useEffect(() => {
     fetchMyTracks();
     fetchMyReports();
   }, [statusFilter]);
+
+  useEffect(() => {
+    fetchMyPlaylists();
+  }, []);
 
   useEffect(() => {
     if (!coverOk) return undefined;
@@ -61,6 +81,52 @@ export default function Profile() {
     const t = setTimeout(() => setUploadNotice(''), 14000);
     return () => clearTimeout(t);
   }, [uploadNotice]);
+
+  useEffect(() => {
+    if (!playlistFlash) return undefined;
+    const t = setTimeout(() => setPlaylistFlash(''), 4000);
+    return () => clearTimeout(t);
+  }, [playlistFlash]);
+
+  const handleCreatePlaylist = () => {
+    if (!newPlaylistTitle.trim()) return;
+    playlistsApi
+      .createMy({ title: newPlaylistTitle.trim(), isPublic: newPlaylistPublic })
+      .then((r) => {
+        setMyPlaylists((prev) => [r.data, ...prev]);
+        setNewPlaylistTitle('');
+        setNewPlaylistPublic(false);
+        setPlaylistFlash('Плейлист создан');
+      })
+      .catch((e) => setPlaylistFlash(e.response?.data?.message || 'Не удалось создать плейлист'));
+  };
+
+  const handleDeletePlaylist = (plId) => {
+    // eslint-disable-next-line no-alert
+    if (!window.confirm('Удалить этот плейлист?')) return;
+    setDeletingPlaylistId(plId);
+    playlistsApi
+      .deleteMy(plId)
+      .then(() => {
+        setMyPlaylists((prev) => prev.filter((p) => p._id !== plId));
+        setPlaylistFlash('Плейлист удалён');
+      })
+      .catch((e) => setPlaylistFlash(e.response?.data?.message || 'Не удалось удалить'))
+      .finally(() => setDeletingPlaylistId(''));
+  };
+
+  const handleTogglePlaylistPublic = (p) => {
+    const currentlyPublic = p.isPublic !== false;
+    setTogglingPlaylistId(p._id);
+    playlistsApi
+      .updateMy(p._id, { isPublic: !currentlyPublic })
+      .then((r) => {
+        setMyPlaylists((prev) => prev.map((x) => (x._id === r.data._id ? r.data : x)));
+        setPlaylistFlash(!currentlyPublic ? 'Виден в каталоге' : 'Скрыт из каталога');
+      })
+      .catch((e) => setPlaylistFlash(e.response?.data?.message || 'Ошибка сохранения'))
+      .finally(() => setTogglingPlaylistId(''));
+  };
 
   const stats = useMemo(() => {
     const list = Array.isArray(tracks) ? tracks : [];
@@ -178,7 +244,7 @@ export default function Profile() {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="page profile-page">
-      <h2 className="page-title">Мои треки</h2>
+      <h2 className="page-title">Личный кабинет</h2>
       <input
         ref={coverInputRef}
         type="file"
@@ -190,6 +256,78 @@ export default function Profile() {
       {uploadNotice && <div className="profile-cover-info">{uploadNotice}</div>}
       {coverInfo && <div className="profile-cover-info">{coverInfo}</div>}
       {coverError && <div className="profile-cover-error">{coverError}</div>}
+
+      <section className="profile-playlists-section" aria-labelledby="profile-playlists-heading">
+        <h3 id="profile-playlists-heading" className="section-title">Мои плейлисты</h3>
+        <p className="profile-playlists-hint">
+          По умолчанию плейлист <strong>приватный</strong> — его не видно на главной и в разделе «Плейлисты», пока не включите показ в каталоге (здесь или на странице плейлиста).
+        </p>
+        {playlistFlash && <div className="profile-playlist-flash">{playlistFlash}</div>}
+        <div className="profile-playlist-create">
+          <input
+            type="text"
+            className="profile-playlist-input"
+            placeholder="Название плейлиста"
+            value={newPlaylistTitle}
+            onChange={(e) => setNewPlaylistTitle(e.target.value)}
+          />
+          <label className="profile-playlist-check">
+            <input
+              type="checkbox"
+              checked={newPlaylistPublic}
+              onChange={(e) => setNewPlaylistPublic(e.target.checked)}
+            />
+            Показать в каталоге и на главной
+          </label>
+          <button type="button" className="neon-btn profile-playlist-create-btn" onClick={handleCreatePlaylist}>
+            Создать плейлист
+          </button>
+        </div>
+        {playlistsLoading ? (
+          <div className="profile-playlists-loading">Загрузка плейлистов...</div>
+        ) : myPlaylists.length === 0 ? (
+          <div className="empty profile-playlists-empty">Плейлистов пока нет — создайте выше или через «В плейлист» у трека.</div>
+        ) : (
+          <ul className="profile-playlist-list">
+            {myPlaylists.map((p) => (
+              <li key={p._id} className="profile-playlist-row">
+                <div className="profile-playlist-main">
+                  <Link to={`/playlist/${p._id}`} className="profile-playlist-link">
+                    {p.title}
+                  </Link>
+                  <span className={`profile-playlist-badge ${p.isPublic !== false ? 'pub' : 'priv'}`}>
+                    {p.isPublic !== false ? 'В каталоге' : 'Приватный'}
+                  </span>
+                </div>
+                <div className="profile-playlist-actions">
+                  <button
+                    type="button"
+                    className="profile-pl-toggle"
+                    disabled={!!togglingPlaylistId}
+                    onClick={() => handleTogglePlaylistPublic(p)}
+                  >
+                    {togglingPlaylistId === p._id
+                      ? '...'
+                      : p.isPublic !== false
+                        ? 'Скрыть из каталога'
+                        : 'Показать в каталоге'}
+                  </button>
+                  <button
+                    type="button"
+                    className="profile-pl-delete"
+                    disabled={deletingPlaylistId === p._id}
+                    onClick={() => handleDeletePlaylist(p._id)}
+                  >
+                    {deletingPlaylistId === p._id ? '...' : 'Удалить'}
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <h3 className="section-title profile-tracks-heading">Мои треки</h3>
       <div className="profile-toolbar">
         <select
           value={statusFilter}
@@ -354,6 +492,86 @@ export default function Profile() {
       )}
       <style>{`
         .page-title { color: var(--neon-cyan); margin-bottom: 24px; }
+        .profile-tracks-heading { margin-top: 8px; }
+        .profile-playlists-section { margin-bottom: 32px; }
+        .profile-playlists-hint {
+          color: var(--text-dim);
+          font-size: 0.9rem;
+          max-width: 640px;
+          line-height: 1.45;
+          margin-bottom: 14px;
+        }
+        .profile-playlist-flash { color: #69db7c; margin-bottom: 12px; font-size: 0.95rem; }
+        .profile-playlist-create {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 12px;
+          align-items: center;
+          margin-bottom: 18px;
+        }
+        .profile-playlist-input {
+          flex: 1;
+          min-width: 200px;
+          padding: 10px 14px;
+          border: 1px solid rgba(5, 217, 232, 0.35);
+          border-radius: 10px;
+          background: rgba(0,0,0,0.25);
+          color: var(--text);
+        }
+        .profile-playlist-check {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 0.9rem;
+          color: var(--text-dim);
+          cursor: pointer;
+        }
+        .profile-playlist-create-btn { margin-left: auto; }
+        .profile-playlists-loading { color: var(--text-dim); margin-bottom: 12px; }
+        .profile-playlists-empty { text-align: left; padding: 16px 0; }
+        .profile-playlist-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+        .profile-playlist-row {
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: space-between;
+          gap: 12px;
+          align-items: center;
+          padding: 12px 14px;
+          border: 1px solid rgba(5, 217, 232, 0.2);
+          border-radius: 12px;
+          background: rgba(0,0,0,0.2);
+        }
+        .profile-playlist-main { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+        .profile-playlist-link { color: var(--neon-cyan); font-weight: 600; text-decoration: none; }
+        .profile-playlist-link:hover { text-decoration: underline; }
+        .profile-playlist-badge {
+          font-size: 0.75rem;
+          padding: 2px 8px;
+          border-radius: 999px;
+          border: 1px solid rgba(255, 200, 0, 0.35);
+        }
+        .profile-playlist-badge.pub { color: #69db7c; border-color: rgba(0, 255, 100, 0.35); }
+        .profile-playlist-badge.priv { color: #ffc800; }
+        .profile-playlist-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .profile-pl-toggle {
+          padding: 6px 12px;
+          font-size: 0.85rem;
+          border: 1px solid rgba(5, 217, 232, 0.45);
+          background: transparent;
+          color: var(--neon-cyan);
+          border-radius: 8px;
+        }
+        .profile-pl-toggle:hover:not(:disabled) { background: rgba(5, 217, 232, 0.1); }
+        .profile-pl-toggle:disabled { opacity: 0.6; }
+        .profile-pl-delete {
+          padding: 6px 12px;
+          font-size: 0.85rem;
+          border: 1px solid rgba(255, 80, 80, 0.5);
+          background: transparent;
+          color: #ff6b6b;
+          border-radius: 8px;
+        }
+        .profile-pl-delete:hover:not(:disabled) { background: rgba(255, 80, 80, 0.08); }
         .profile-page {
           max-width: 1100px;
           margin: 0 auto;

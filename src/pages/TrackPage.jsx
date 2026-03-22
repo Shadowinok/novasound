@@ -21,6 +21,7 @@ export default function TrackPage() {
   const [showPlaylistModal, setShowPlaylistModal] = useState(false);
   const [myPlaylists, setMyPlaylists] = useState([]);
   const [newPlaylistTitle, setNewPlaylistTitle] = useState('');
+  const [newPlaylistPublic, setNewPlaylistPublic] = useState(false);
   const [playlistMessage, setPlaylistMessage] = useState('');
   const { loadTrack, currentTrack, playing, togglePlay } = usePlayer();
   const { user } = useAuth();
@@ -103,13 +104,14 @@ export default function TrackPage() {
       return;
     }
     setPlaylistMessage('');
+    setNewPlaylistPublic(false);
     setShowPlaylistModal(true);
     playlistsApi.myList().then((r) => setMyPlaylists(r.data || [])).catch(() => setMyPlaylists([]));
   };
 
   const handleCreatePlaylist = () => {
     if (!newPlaylistTitle.trim()) return;
-    playlistsApi.createMy({ title: newPlaylistTitle.trim() })
+    playlistsApi.createMy({ title: newPlaylistTitle.trim(), isPublic: newPlaylistPublic })
       .then((r) => {
         setMyPlaylists((prev) => [r.data, ...prev]);
         setNewPlaylistTitle('');
@@ -312,7 +314,7 @@ export default function TrackPage() {
         <div className="report-overlay" onClick={() => setShowPlaylistModal(false)}>
           <div className="report-modal" onClick={(e) => e.stopPropagation()}>
             <h3 className="report-title">Добавить в плейлист</h3>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
               <input
                 className="report-textarea"
                 style={{ minHeight: 44 }}
@@ -322,6 +324,14 @@ export default function TrackPage() {
               />
               <button type="button" className="report-submit" onClick={handleCreatePlaylist}>Создать</button>
             </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, fontSize: '0.9rem', color: 'var(--text-dim)' }}>
+              <input
+                type="checkbox"
+                checked={newPlaylistPublic}
+                onChange={(e) => setNewPlaylistPublic(e.target.checked)}
+              />
+              Показать в каталоге и на главной
+            </label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 260, overflow: 'auto' }}>
               {myPlaylists.map((p) => (
                 <div key={p._id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
