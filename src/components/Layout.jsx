@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Outlet, Link } from 'react-router-dom';
+import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import ParticleBackground from './ParticleBackground';
 import RadialMenu from './RadialMenu';
@@ -8,6 +8,7 @@ import './Layout.css';
 
 export default function Layout() {
   const { user, isAdmin } = useAuth();
+  const { pathname } = useLocation();
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -26,34 +27,36 @@ export default function Layout() {
   return (
     <div className="layout">
       <ParticleBackground />
-      <header className="header">
-        <div className="header-inner">
-          <div className="auth-links">
-            {user ? (
-              <div className="user-box">
-                <span className="user-name">{user.username}</span>
-                <span className="msk-clock">MSK {mskTime}</span>
-              </div>
-            ) : (
-              <>
-                <a href="/login" className="nav-link">Вход</a>
-                <a href="/register" className="nav-link">Регистрация</a>
-              </>
-            )}
+      <div className="layout-shell">
+        <header className="header">
+          <div className="header-inner">
+            <div className="auth-links">
+              {user ? (
+                <div className="user-box">
+                  <span className="user-name">{user.username}</span>
+                  <span className="msk-clock">MSK {mskTime}</span>
+                </div>
+              ) : (
+                <>
+                  <a href="/login" className="nav-link">Вход</a>
+                  <a href="/register" className="nav-link">Регистрация</a>
+                </>
+              )}
+            </div>
+            <h1 className="site-title">
+              <span className="neon-pink">Nova</span><span className="neon-cyan">Sound</span>
+            </h1>
           </div>
-          <h1 className="site-title">
-            <span className="neon-pink">Nova</span><span className="neon-cyan">Sound</span>
-          </h1>
-        </div>
-      </header>
-      <main className="main">
-        <Outlet />
-      </main>
-      <footer className="site-footer">
-        <Link to="/about">О проекте</Link>
-        <Link to="/radio">Радио</Link>
-        <Link to="/terms">Правила</Link>
-      </footer>
+        </header>
+        <main className="main">
+          <Outlet />
+        </main>
+        <footer className="site-footer">
+          {pathname !== '/about' && <Link to="/about">О проекте</Link>}
+          {pathname !== '/radio' && <Link to="/radio">Радио</Link>}
+          {pathname !== '/terms' && <Link to="/terms">Правила</Link>}
+        </footer>
+      </div>
       <RadialMenu user={user} isAdmin={isAdmin} />
       <PlayerBar />
     </div>
