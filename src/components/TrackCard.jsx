@@ -24,8 +24,18 @@ export default function TrackCard({ track, showStatus, coverDisplayUrl, showPend
   const [newPlaylistTitle, setNewPlaylistTitle] = useState('');
   const [actionMessage, setActionMessage] = useState('');
 
+  const coverRaw = coverDisplayUrl || track.coverImage;
+  const coverBust = track.updatedAt ? new Date(track.updatedAt).getTime() : (coverRaw ? String(coverRaw).slice(-24) : '');
+  const coverBgStyle =
+    coverRaw
+      ? {
+          backgroundImage: `url("${coverRaw}${coverRaw.includes('?') ? '&' : '?'}cb=${encodeURIComponent(String(coverBust))}")`
+        }
+      : { backgroundImage: 'linear-gradient(135deg, var(--neon-purple), var(--neon-pink))' };
+
   const handlePlay = (e) => {
     e.preventDefault();
+    e.stopPropagation();
     if (!user) {
       navigate('/login');
       return;
@@ -117,11 +127,8 @@ export default function TrackCard({ track, showStatus, coverDisplayUrl, showPend
       <Link to={`/track/${track._id}`} className="track-card-link">
         <div
           className="track-cover"
-          style={{
-            backgroundImage: (coverDisplayUrl || track.coverImage)
-              ? `url(${coverDisplayUrl || track.coverImage})`
-              : 'linear-gradient(135deg, var(--neon-purple), var(--neon-pink))'
-          }}
+          key={`cov-${track._id}-${coverRaw}-${coverBust}`}
+          style={coverBgStyle}
         >
           {showPendingCoverBadge && (
             <span className="track-cover-pending-badge">Обложка на модерации</span>

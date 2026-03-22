@@ -41,10 +41,17 @@ export default function PlayerBar() {
           <input
             type="range"
             min={0}
-            max={duration || 100}
-            value={progress}
-            onChange={(e) => seek(Number(e.target.value))}
+            max={duration > 0 ? duration : 1}
+            step="any"
+            value={duration > 0 ? Math.min(progress, duration) : 0}
+            disabled={!duration || duration <= 0}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              if (duration > 0 && Number.isFinite(v)) seek(v);
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
             className="player-slider"
+            aria-label="Прогресс воспроизведения"
           />
           <span className="player-time">{formatTime(duration)}</span>
         </div>
