@@ -19,6 +19,7 @@ export default function Admin() {
   const [resolvingReportId, setResolvingReportId] = useState('');
   const [adminComments, setAdminComments] = useState({});
   const [loading, setLoading] = useState(true);
+  const [pendingCovers, setPendingCovers] = useState([]);
 
   const fetchPending = () => {
     adminApi.pendingTracks().then((r) => setPending(r.data || [])).catch(() => setPending([]));
@@ -40,6 +41,11 @@ export default function Admin() {
     setLoading(true);
     if (tab === 'moderation') {
       adminApi.pendingTracks().then((r) => setPending(r.data || [])).catch(() => setPending([])).finally(() => setLoading(false));
+    } else if (tab === 'covers') {
+      adminApi.coverPending()
+        .then((r) => setPendingCovers(r.data || []))
+        .catch(() => setPendingCovers([]))
+        .finally(() => setLoading(false));
     } else if (tab === 'playlists') {
       client.get('/playlists').then((r) => setPlaylists(r.data || [])).catch(() => setPlaylists([])).finally(() => setLoading(false));
     } else if (tab === 'reports') {
@@ -63,6 +69,22 @@ export default function Admin() {
       setComment('');
       fetchPending();
     }).catch(() => {});
+  };
+
+  const handleApproveCover = (id) => {
+    adminApi.approveCover(id).then(() => {
+      setAdminMessage('Обложка опубликована');
+      adminApi.coverPending().then((r) => setPendingCovers(r.data || [])).catch(() => {});
+    }).catch((e) => setAdminMessage(e.response?.data?.message || 'Ошибка'));
+  };
+
+  const handleRejectCoverModeration = (id) => {
+    if (!window.confirm('Отклонить новую обложку? Останется старая.')) return;
+    adminApi.rejectCoverModeration(id, comment).then(() => {
+      setComment('');
+      setAdminMessage('Обложка отклонена');
+      adminApi.coverPending().then((r) => setPendingCovers(r.data || [])).catch(() => {});
+    }).catch((e) => setAdminMessage(e.response?.data?.message || 'Ошибка'));
   };
   const handleDeleteUser = (id) => {
     if (!id) return;
@@ -98,10 +120,41 @@ export default function Admin() {
       <h2 className="page-title">Админ-панель</h2>
       <div className="admin-tabs">
         <button type="button" className={tab === 'moderation' ? 'active' : ''} onClick={() => setTab('moderation')}>Модерация треков</button>
+        <button type="button" className={tab === 'covers' ? 'active' : ''} onClick={() => setTab('covers')}>Обложки</button>
         <button type="button" className={tab === 'playlists' ? 'active' : ''} onClick={() => setTab('playlists')}>Плейлисты</button>
         <button type="button" className={tab === 'users' ? 'active' : ''} onClick={() => setTab('users')}>Пользователи</button>
         <button type="button" className={tab === 'reports' ? 'active' : ''} onClick={() => setTab('reports')}>Жалобы на треки</button>
       </div>
+      {tab === 'covers' && (
+        <>
+          <p className="admin-hint">Обложки после проверки ИИ по имени файла (подозрительные — на ручную проверку).</p>
+          {adminMessage && <div className="admin-message">{adminMessage}</div>}
+          <input
+            type="text"
+            placeholder="Комментарий при отклонении обложки (опционально)"
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            className="admin-comment-input"
+          />
+          {loading ? (
+            <div className="loading">Загрузка...</div>
+          ) : pendingCovers.length === 0 ? (
+            <div className="empty">Нет обложек на модерации</div>
+          ) : (
+            <div className="admin-pending-grid">
+              {pendingCovers.map((track) => (
+                <motion.div key={track._id} className="admin-card" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                  <TrackCard track={track} showStatus coverDisplayUrl={track.coverImagePending || track.coverImage} />
+                  <div className="admin-card-actions">
+                    <button type="button" className="admin-btn approve" onClick={() => handleApproveCover(track._id)}>Одобрить обложку</button>
+                    <button type="button" className="admin-btn reject" onClick={() => handleRejectCoverModeration(track._id)}>Отклонить</button>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
       {tab === 'moderation' && (
         <>
           <p className="admin-hint">Одобрите или отклоните треки. Можно добавить комментарий.</p>
@@ -210,6 +263,7 @@ export default function Admin() {
               <table className="reports-table">
                 <thead>
                   <tr>
+                    <th>Тип</th>
                     <th>Трек</th>
                     <th>Автор</th>
                     <th>Жалобщик</th>
@@ -221,6 +275,7 @@ export default function Admin() {
                 <tbody>
                   {trackReports.map((rep) => (
                     <tr key={rep._id}>
+                      <td>{rep.reportType === 'cover' ? 'Обложка' : 'Контент'}</td>
                       <td>{rep.track?.title || '-'}</td>
                       <td>{rep.track?.author?.username || '-'}</td>
                       <td>{rep.reporter?.username || '-'}</td>
@@ -257,6 +312,16 @@ export default function Admin() {
                           >
                             {resolvingReportId === rep._id ? '...' : 'Отклонить трек'}
                           </button>
+                          {rep.reportType === 'cover' && (
+                            <button
+                              type="button"
+                              className="admin-btn reject"
+                              disabled={resolvingReportId === rep._id}
+                              onClick={() => handleResolveReport(rep._id, 'rejectCover')}
+                            >
+                              {resolvingReportId === rep._id ? '...' : 'Снять обложку'}
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

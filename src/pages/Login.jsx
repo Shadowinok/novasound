@@ -21,7 +21,14 @@ export default function Login() {
         login(r.data.token, r.data.user);
         navigate('/');
       })
-      .catch((err) => setError(err.response?.data?.message || 'Ошибка входа'))
+      .catch((err) => {
+        const d = err.response?.data;
+        if (err.response?.status === 403 && d?.needsVerification && d?.email) {
+          navigate('/register/check-email', { state: { email: d.email } });
+          return;
+        }
+        setError(d?.message || 'Ошибка входа');
+      })
       .finally(() => setLoading(false));
   };
 

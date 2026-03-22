@@ -10,14 +10,12 @@ export default function Register() {
   const [password, setPassword] = useState('');
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = (e) => {
     e.preventDefault();
     setError('');
-    setSuccess('');
     if (!acceptTerms) {
       setError('Нужно принять правила сервиса');
       return;
@@ -25,8 +23,8 @@ export default function Register() {
     setLoading(true);
     auth.register({ username, email, password, acceptTerms: true })
       .then((r) => {
-        setSuccess(r.data?.message || 'Письмо с подтверждением отправлено. Проверьте почту.');
-        setTimeout(() => navigate('/login'), 1200);
+        const em = r.data?.email || email;
+        navigate('/register/check-email', { state: { email: em }, replace: true });
       })
       .catch((err) => setError(err.response?.data?.message || 'Ошибка регистрации'))
       .finally(() => setLoading(false));
@@ -77,7 +75,6 @@ export default function Register() {
             </span>
           </label>
           {error && <div className="auth-error">{error}</div>}
-          {success && <div className="auth-success">{success}</div>}
           <button type="submit" disabled={loading} className="auth-submit">Зарегистрироваться</button>
         </form>
         <p className="auth-footer">Уже есть аккаунт? <Link to="/login">Вход</Link></p>

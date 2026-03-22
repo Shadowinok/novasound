@@ -203,7 +203,13 @@ export default function Profile() {
           <h3 className="section-title">Топ по прослушиваниям</h3>
           <div className="track-grid">
             {stats.top.map((t) => (
-              <TrackCard key={t._id} track={t} showStatus />
+              <TrackCard
+                key={t._id}
+                track={t}
+                showStatus
+                coverDisplayUrl={t.coverChangeStatus === 'pending' && t.coverImagePending ? t.coverImagePending : undefined}
+                showPendingCoverBadge={t.coverChangeStatus === 'pending' && !!t.coverImagePending}
+              />
             ))}
           </div>
         </div>
@@ -272,7 +278,12 @@ export default function Profile() {
         <div className="track-grid">
           {tracks.map((t) => (
             <div key={t._id} className="my-track">
-              <TrackCard track={t} showStatus />
+              <TrackCard
+                track={t}
+                showStatus
+                coverDisplayUrl={t.coverChangeStatus === 'pending' && t.coverImagePending ? t.coverImagePending : undefined}
+                showPendingCoverBadge={t.coverChangeStatus === 'pending' && !!t.coverImagePending}
+              />
               <div className="my-track-actions">
                 {t.status === 'approved' && (
                   <button
