@@ -1,8 +1,13 @@
 import React, { createContext, useContext, useState, useRef, useCallback, useEffect } from 'react';
 import { Howl, Howler } from 'howler';
-
-Howler.autoUnlock = true;
 import { tracks as tracksApi, getAudioUrl } from '../api/client';
+
+/**
+ * По умолчанию Howler вешает на document первый click/touch и для «разблокировки»
+ * вызывает .load() на HTML5 Audio — это сбрасывает уже играющий трек после первого клика мышью.
+ * Воспроизведение и так запускается по клику «Play» (валидный user gesture).
+ */
+Howler.autoUnlock = false;
 
 const PlayerContext = createContext(null);
 
