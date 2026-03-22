@@ -1,5 +1,4 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
 /**
@@ -16,12 +15,6 @@ export default function About() {
           треки, в том числе сделанные с ИИ — сервис держит рамку: <strong>это про ИИ и людей</strong>, а не безликий
           хостинг файлов. Мы называем это <strong>диалогом ИИ и людей</strong> — без мистификации «магии кнопки», с
           нормальным отношением к авторству, этике и модерации; правила и подсказки на сайте — часть этого.
-        </p>
-
-        <p className="about-foot">
-          <Link to="/terms">Правила сервиса</Link>
-          {' · '}
-          <Link to="/">На главную</Link>
         </p>
       </div>
       <style>{`
@@ -44,9 +37,6 @@ export default function About() {
           border: 1px solid rgba(5, 217, 232, 0.25);
           background: rgba(5, 217, 232, 0.06);
         }
-        .about-body a { color: var(--neon-pink); text-decoration: none; border-bottom: 1px solid rgba(255, 42, 109, 0.35); }
-        .about-body a:hover { text-shadow: 0 0 12px rgba(255, 42, 109, 0.35); }
-        .about-foot { margin-top: 32px; font-size: 0.95rem; color: var(--text-dim); }
       `}</style>
     </motion.div>
   );

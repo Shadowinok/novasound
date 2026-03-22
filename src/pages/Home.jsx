@@ -61,9 +61,6 @@ export default function Home() {
             <TrackCard key={t._id} track={t} />
           ))}
         </div>
-        <div className="section-more">
-          <Link to="/catalog" className="neon-btn">Весь каталог</Link>
-        </div>
       </section>
       <style>{`
         .page { padding: 0 8px; }

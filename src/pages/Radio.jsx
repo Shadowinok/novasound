@@ -26,7 +26,6 @@ export default function Radio() {
         <div className="radio-cta">
           <Link to="/charts" className="radio-btn">Чарты</Link>
           <Link to="/playlists" className="radio-btn radio-btn-ghost">Плейлисты</Link>
-          <Link to="/about" className="radio-link-quiet">О проекте</Link>
         </div>
       </div>
 
@@ -95,12 +94,6 @@ export default function Radio() {
           color: var(--neon-cyan);
         }
         .radio-btn-ghost:hover { background: rgba(5, 217, 232, 0.06); box-shadow: var(--glow-cyan); }
-        .radio-link-quiet {
-          color: var(--text-dim);
-          font-size: 0.95rem;
-          margin-left: auto;
-        }
-        .radio-link-quiet:hover { color: var(--text); }
       `}</style>
     </motion.div>
   );
