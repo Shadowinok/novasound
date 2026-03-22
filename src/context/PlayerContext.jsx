@@ -112,6 +112,18 @@ export function PlayerProvider({ children }) {
     setProgress(value);
   }, []);
 
+  /** Остановить и убрать плеер с экрана */
+  const closePlayer = useCallback(() => {
+    if (howlRef.current) {
+      howlRef.current.unload();
+      howlRef.current = null;
+    }
+    setCurrentTrack(null);
+    setPlaying(false);
+    setProgress(0);
+    setDuration(0);
+  }, []);
+
   // Только currentTrack — иначе при паузе/плей эффект пересоздаётся и на части браузеров глючит HTML5 Audio
   useEffect(() => {
     const howl = howlRef.current;
@@ -138,7 +150,8 @@ export function PlayerProvider({ children }) {
       seek,
       setPlayerVolume,
       setProgress,
-      setDuration
+      setDuration,
+      closePlayer
     }}>
       {children}
     </PlayerContext.Provider>
