@@ -105,7 +105,10 @@ export default function TrackCard({
 
   const handleAddToPlaylist = (playlistId) => {
     playlistsApi.addTrack(playlistId, track._id)
-      .then((r) => setActionMessage(r.data?.message || 'Добавлено'))
+      .then((r) => {
+        setActionMessage(r.data?.message || 'Добавлено');
+        setShowPlaylist(false);
+      })
       .catch((e) => setActionMessage(e.response?.data?.message || 'Не удалось добавить трек'));
   };
 
