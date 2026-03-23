@@ -4,10 +4,28 @@ import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { auth } from '../api/client';
 
+function EyeIcon({ open }) {
+  if (open) {
+    return (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
+        <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" />
+        <circle cx="12" cy="12" r="3" />
+      </svg>
+    );
+  }
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
+      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+      <line x1="1" y1="1" x2="23" y2="23" />
+    </svg>
+  );
+}
+
 export default function Register() {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -15,6 +33,7 @@ export default function Register() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (loading) return;
     setError('');
     if (!acceptTerms) {
       setError('Нужно принять правила сервиса');
@@ -52,15 +71,27 @@ export default function Register() {
             required
             className="auth-input"
           />
-          <input
-            type="password"
-            placeholder="Пароль (мин. 6 символов)"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={6}
-            className="auth-input"
-          />
+          <div className="auth-field-password">
+            <input
+              type={showPassword ? 'text' : 'password'}
+              placeholder="Пароль (мин. 6 символов)"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={6}
+              className="auth-input auth-input-password"
+              autoComplete="new-password"
+            />
+            <button
+              type="button"
+              className="auth-toggle-password"
+              tabIndex={-1}
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+            >
+              <EyeIcon open={!showPassword} />
+            </button>
+          </div>
           <label className="auth-terms">
             <input
               type="checkbox"
@@ -75,7 +106,16 @@ export default function Register() {
             </span>
           </label>
           {error && <div className="auth-error">{error}</div>}
-          <button type="submit" disabled={loading} className="auth-submit">Зарегистрироваться</button>
+          <button type="submit" disabled={loading} className="auth-submit">
+            {loading ? (
+              <span className="auth-submit-inner">
+                <span className="auth-spinner" aria-hidden />
+                Отправка…
+              </span>
+            ) : (
+              'Зарегистрироваться'
+            )}
+          </button>
         </form>
         <p className="auth-footer">Уже есть аккаунт? <Link to="/login">Вход</Link></p>
       </div>
@@ -100,6 +140,42 @@ export default function Register() {
           background: rgba(0,0,0,0.3);
           color: var(--text);
         }
+        .auth-field-password { position: relative; margin-bottom: 16px; }
+        .auth-input-password { margin-bottom: 0; padding-right: 48px; }
+        .auth-toggle-password {
+          position: absolute;
+          right: 6px;
+          top: 50%;
+          transform: translateY(-50%);
+          background: rgba(0,0,0,0.35);
+          border: 1px solid rgba(5, 217, 232, 0.35);
+          border-radius: 8px;
+          cursor: pointer;
+          padding: 6px;
+          color: var(--neon-cyan);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          line-height: 0;
+        }
+        .auth-toggle-password:hover { border-color: var(--neon-cyan); box-shadow: 0 0 12px rgba(5, 217, 232, 0.25); }
+        .auth-submit-inner {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+        }
+        .auth-spinner {
+          width: 20px;
+          height: 20px;
+          border: 2px solid rgba(255, 42, 109, 0.25);
+          border-top-color: var(--neon-pink);
+          border-radius: 50%;
+          animation: auth-spin 0.65s linear infinite;
+        }
+        @keyframes auth-spin {
+          to { transform: rotate(360deg); }
+        }
         .auth-error { color: #ff6b6b; margin-bottom: 12px; font-size: 0.9rem; }
         .auth-success { color: #00ff64; margin-bottom: 12px; font-size: 0.9rem; }
         .auth-submit {
@@ -110,7 +186,10 @@ export default function Register() {
           color: var(--neon-pink);
           border-radius: 8px;
           font-weight: 600;
+          font-size: 1rem;
         }
+        .auth-submit:disabled { opacity: 0.85; cursor: wait; }
+        .auth-submit:hover:not(:disabled) { background: rgba(255, 42, 109, 0.4); }
         .auth-terms {
           display: flex;
           align-items: center;
