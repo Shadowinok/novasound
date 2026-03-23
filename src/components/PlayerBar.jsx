@@ -92,15 +92,6 @@ export default function PlayerBar() {
           <button type="button" className="player-btn nav-btn" onClick={playNext} disabled={!canNext} aria-label="Следующий трек">
             ⏭
           </button>
-          <button
-            type="button"
-            className={`player-btn repeat-btn mode-${repeatMode}`}
-            onClick={cycleRepeatMode}
-            aria-label="Режим повтора"
-            title="Режим повтора"
-          >
-            {repeatLabel}
-          </button>
           <span className="player-time">{formatTime(progress)}</span>
           <input
             type="range"
@@ -122,18 +113,6 @@ export default function PlayerBar() {
         <div className="player-volume-wrap" ref={volumeWrapRef}>
           <button
             type="button"
-            className="player-close"
-            aria-label="Закрыть плеер"
-            title="Закрыть плеер"
-            onClick={() => {
-              setVolumeOpen(false);
-              closePlayer();
-            }}
-          >
-            <span aria-hidden>✕</span>
-          </button>
-          <button
-            type="button"
             className="volume-toggle"
             aria-label="Громкость"
             aria-expanded={volumeOpen}
@@ -143,6 +122,27 @@ export default function PlayerBar() {
             <span className="volume-toggle-icon" aria-hidden>
               {volumeIcon}
             </span>
+          </button>
+          <button
+            type="button"
+            className={`player-btn repeat-btn mode-${repeatMode}`}
+            onClick={cycleRepeatMode}
+            aria-label="Режим повтора"
+            title="Режим повтора"
+          >
+            {repeatLabel}
+          </button>
+          <button
+            type="button"
+            className="player-close"
+            aria-label="Закрыть плеер"
+            title="Закрыть плеер"
+            onClick={() => {
+              setVolumeOpen(false);
+              closePlayer();
+            }}
+          >
+            <span aria-hidden>✕</span>
           </button>
           <AnimatePresence>
             {volumeOpen && (
@@ -311,13 +311,15 @@ export default function PlayerBar() {
             background: rgba(255, 42, 109, 0.3);
           }
           .repeat-btn {
-            min-width: 52px;
-            width: auto;
+            min-width: 48px;
+            width: 48px;
+            height: 44px;
             border-radius: 999px;
-            padding: 0 10px;
+            padding: 0 8px;
             font-size: 0.9rem;
             font-family: var(--font-display);
             letter-spacing: 0.02em;
+            box-shadow: none;
           }
           .repeat-btn.mode-one, .repeat-btn.mode-all {
             border-color: rgba(5, 217, 232, 0.6);
