@@ -165,6 +165,7 @@ export const playlists = {
 };
 
 export const admin = {
+  playlists: () => client.get('/admin/playlists'),
   users: () => client.get('/admin/users'),
   deleteUser: (id, reason) => client.delete(`/admin/users/${id}`, { data: { reason } }),
   pendingTracks: () => client.get('/admin/tracks/pending'),
