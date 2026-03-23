@@ -3,11 +3,21 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { tracks as tracksApi } from '../api/client';
 
+const GENRE_OPTIONS = [
+  { value: 'rock-metal', label: 'Рок / Металл' },
+  { value: 'pop', label: 'Поп' },
+  { value: 'jazz', label: 'Джаз' },
+  { value: 'hiphop-rap', label: 'Хип-хоп / Рэп' },
+  { value: 'electronic', label: 'Электроника' },
+  { value: 'other', label: 'Другое' }
+];
+
 export default function UploadTrack({ onClose, onSuccess }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [audioFile, setAudioFile] = useState(null);
   const [coverFile, setCoverFile] = useState(null);
+  const [genre, setGenre] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -22,12 +32,17 @@ export default function UploadTrack({ onClose, onSuccess }) {
       setError('Название от 3 до 100 символов');
       return;
     }
+    if (!genre) {
+      setError('Выберите жанр для загрузки в плейлист');
+      return;
+    }
     setError('');
     setLoading(true);
     setProgress(0);
     const formData = new FormData();
     formData.append('title', title);
     formData.append('description', description);
+    formData.append('genre', genre);
     formData.append('audio', audioFile);
     if (coverFile) formData.append('cover', coverFile);
     tracksApi.createWithProgress(formData, ({ pct }) => setProgress(pct))
@@ -97,6 +112,18 @@ export default function UploadTrack({ onClose, onSuccess }) {
             rows={3}
             className="upload-input"
           />
+          <label className="upload-label">Жанр *</label>
+          <select
+            value={genre}
+            onChange={(e) => setGenre(e.target.value)}
+            required
+            className="upload-input"
+          >
+            <option value="">Выберите жанр для загрузки в плейлист</option>
+            {GENRE_OPTIONS.map((g) => (
+              <option key={g.value} value={g.value}>{g.label}</option>
+            ))}
+          </select>
           <label className="upload-label">Аудио (MP3, WAV, OGG, M4A) *</label>
           <input
             type="file"
