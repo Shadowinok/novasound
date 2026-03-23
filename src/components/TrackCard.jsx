@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -30,6 +30,12 @@ export default function TrackCard({
   const [myPlaylists, setMyPlaylists] = useState([]);
   const [newPlaylistTitle, setNewPlaylistTitle] = useState('');
   const [actionMessage, setActionMessage] = useState('');
+
+  useEffect(() => {
+    if (!actionMessage) return undefined;
+    const id = setTimeout(() => setActionMessage(''), 2200);
+    return () => clearTimeout(id);
+  }, [actionMessage]);
 
   const coverRaw = coverDisplayUrl || track.coverImage;
   const coverBust = track.updatedAt ? new Date(track.updatedAt).getTime() : (coverRaw ? String(coverRaw).slice(-24) : '');
