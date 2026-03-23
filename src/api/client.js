@@ -258,6 +258,7 @@ export const playlists = {
 
 export const admin = {
   playlists: (scope = 'editorial') => client.get('/admin/playlists', { params: { scope } }),
+  syncHybridPlaylists: () => client.post('/admin/playlists/hybrid/sync'),
   users: () => client.get('/admin/users'),
   deleteUser: (id, reason) => client.delete(`/admin/users/${id}`, { data: { reason } }),
   pendingTracks: () => client.get('/admin/tracks/pending'),
