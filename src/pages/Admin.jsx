@@ -33,6 +33,7 @@ export default function Admin() {
   const [plFormOk, setPlFormOk] = useState('');
   const [plFormErr, setPlFormErr] = useState('');
   const [plScope, setPlScope] = useState('editorial');
+  const [plHomeFilter, setPlHomeFilter] = useState('all');
 
   const fetchPending = () => {
     adminApi.pendingTracks().then((r) => setPending(r.data || [])).catch(() => setPending([]));
@@ -273,6 +274,13 @@ export default function Admin() {
     });
   }, [users, userSearch]);
 
+  const visiblePlaylists = useMemo(() => {
+    if (plHomeFilter === 'featured') {
+      return playlists.filter((p) => !!p.featuredOnHome);
+    }
+    return playlists;
+  }, [playlists, plHomeFilter]);
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="page admin-page">
       <h2 className="page-title">Админ-панель</h2>
@@ -379,6 +387,14 @@ export default function Admin() {
             >
               {plSaving ? 'Синхронизируем...' : 'Только релизы месяца'}
             </button>
+            <select
+              className="admin-pl-home-filter"
+              value={plHomeFilter}
+              onChange={(e) => setPlHomeFilter(e.target.value)}
+            >
+              <option value="all">Все плейлисты</option>
+              <option value="featured">Только на главной</option>
+            </select>
           </div>
           {plFormOk && <div className="admin-message">{plFormOk}</div>}
           {plFormErr && <div className="admin-pl-error">{plFormErr}</div>}
@@ -450,11 +466,11 @@ export default function Admin() {
           </form>
           {loading ? (
             <div className="loading">Загрузка...</div>
-          ) : playlists.length === 0 ? (
+          ) : visiblePlaylists.length === 0 ? (
             <div className="empty">Плейлистов пока нет</div>
           ) : (
             <div className="admin-playlist-grid">
-              {playlists.map((p) => (
+              {visiblePlaylists.map((p) => (
                 <div key={p._id} className="admin-playlist-card">
                   <div
                     className="admin-playlist-card-cover"
@@ -700,6 +716,14 @@ export default function Admin() {
           color: var(--neon-cyan) !important;
           border: 1px solid rgba(5, 217, 232, 0.45) !important;
           padding: 8px 12px !important;
+        }
+        .admin-pl-home-filter {
+          padding: 8px 12px;
+          border: 1px solid rgba(211, 0, 197, 0.35);
+          border-radius: 8px;
+          background: rgba(0,0,0,0.32);
+          color: var(--text);
+          min-width: 170px;
         }
         .admin-comment-input {
           width: 100%;
