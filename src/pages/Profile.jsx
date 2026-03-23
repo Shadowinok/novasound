@@ -6,6 +6,19 @@ import { useAuth } from '../context/AuthContext';
 import TrackCard from '../components/TrackCard';
 import UploadTrack from '../components/UploadTrack';
 
+/** Обложка карточки: `playlist.coverImage` → иначе обложка первого трека → градиент (как на главной). */
+function playlistCardCoverStyle(p) {
+  if (p.coverImage) {
+    return { backgroundImage: `url(${p.coverImage})` };
+  }
+  const tracks = Array.isArray(p.tracks) ? p.tracks : [];
+  const t = tracks.find((x) => x && x.coverImage);
+  if (t?.coverImage) {
+    return { backgroundImage: `url(${t.coverImage})` };
+  }
+  return { backgroundImage: 'linear-gradient(135deg, var(--neon-purple), var(--neon-pink))' };
+}
+
 export default function Profile() {
   const navigate = useNavigate();
   const { logout, isAdmin } = useAuth();
@@ -32,9 +45,13 @@ export default function Profile() {
   const [newPlaylistTitle, setNewPlaylistTitle] = useState('');
   const [playlistFlash, setPlaylistFlash] = useState('');
   const [deletingPlaylistId, setDeletingPlaylistId] = useState('');
+  const [playlistCoverUploadingId, setPlaylistCoverUploadingId] = useState('');
+  const [playlistCoverError, setPlaylistCoverError] = useState('');
   const coverInputRef = useRef(null);
+  const playlistCoverInputRef = useRef(null);
   /** Синхронный id трека для обложки — иначе React state не успевает до onChange файла */
   const pendingCoverTrackIdRef = useRef(null);
+  const pendingPlaylistCoverIdRef = useRef(null);
 
   const fetchMyTracks = () => {
     setLoading(true);
@@ -173,6 +190,48 @@ export default function Profile() {
     coverInputRef.current?.click();
   };
 
+  const openPlaylistCoverPicker = (playlistId) => {
+    setPlaylistCoverError('');
+    setPlaylistFlash('');
+    pendingPlaylistCoverIdRef.current = playlistId;
+    if (playlistCoverInputRef.current) playlistCoverInputRef.current.value = '';
+    playlistCoverInputRef.current?.click();
+  };
+
+  const handlePlaylistCoverFile = (e) => {
+    const file = e.target.files?.[0];
+    const plId = pendingPlaylistCoverIdRef.current;
+    if (!file || !plId) return;
+    const fd = new FormData();
+    fd.append('cover', file);
+    setPlaylistCoverUploadingId(plId);
+    setPlaylistCoverError('');
+    setPlaylistFlash('');
+    playlistsApi
+      .updateMyCover(plId, fd)
+      .then((r) => {
+        const u = r?.data;
+        if (u?._id) {
+          setMyPlaylists((prev) => prev.map((x) => (String(x._id) === String(u._id) ? u : x)));
+        }
+        setPlaylistFlash('Обложка плейлиста обновлена');
+      })
+      .catch((err) => {
+        const d = err.response?.data;
+        const msg =
+          d?.message
+          || d?.errors?.[0]?.msg
+          || err.message
+          || 'Не удалось загрузить обложку';
+        setPlaylistCoverError(msg);
+      })
+      .finally(() => {
+        setPlaylistCoverUploadingId('');
+        pendingPlaylistCoverIdRef.current = null;
+        e.target.value = '';
+      });
+  };
+
   const handleCoverFile = (e) => {
     const file = e.target.files?.[0];
     const trackIdForCover = pendingCoverTrackIdRef.current || coverTrackId;
@@ -236,6 +295,13 @@ export default function Profile() {
         className="profile-cover-input"
         onChange={handleCoverFile}
       />
+      <input
+        ref={playlistCoverInputRef}
+        type="file"
+        accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+        className="profile-cover-input"
+        onChange={handlePlaylistCoverFile}
+      />
       {coverOk && <div className="profile-cover-ok">Обложка обновлена</div>}
       {uploadNotice && <div className="profile-cover-info">{uploadNotice}</div>}
       {coverInfo && <div className="profile-cover-info">{coverInfo}</div>}
@@ -245,9 +311,10 @@ export default function Profile() {
         <h3 id="profile-playlists-heading" className="section-title">Мои плейлисты</h3>
         <p className="profile-playlists-hint">
           Здесь создаются только <strong>личные</strong> плейлисты. Публичные подборки для главной и каталога создаются в{' '}
-          <strong>админ-панели</strong> (раздел «Плейлисты»).
+          <strong>админ-панели</strong> (раздел «Плейлисты»). Обложку своего плейлиста можно загрузить кнопкой «Обложка» на карточке (jpg, png, webp, до 5 МБ).
         </p>
         {playlistFlash && <div className="profile-playlist-flash">{playlistFlash}</div>}
+        {playlistCoverError && <div className="profile-playlist-cover-error">{playlistCoverError}</div>}
         <div className="profile-playlist-create">
           <input
             type="text"
@@ -265,35 +332,53 @@ export default function Profile() {
         ) : myPlaylists.length === 0 ? (
           <div className="empty profile-playlists-empty">Плейлистов пока нет — создайте выше или через «В плейлист» у трека.</div>
         ) : (
-          <ul className="profile-playlist-list">
+          <div className="profile-playlist-grid">
             {myPlaylists.map((p) => (
-              <li key={p._id} className="profile-playlist-row">
-                <div className="profile-playlist-main">
-                  <Link to={`/playlist/${p._id}`} className="profile-playlist-link">
-                    {p.title}
-                  </Link>
+              <div key={p._id} className="profile-playlist-card">
+                <Link to={`/playlist/${p._id}`} className="profile-playlist-card-hit">
+                  <div
+                    className="profile-playlist-card-cover"
+                    style={playlistCardCoverStyle(p)}
+                  />
+                  <span className="profile-playlist-card-title">{p.title}</span>
+                </Link>
+                <div className="profile-playlist-card-footer">
                   <span className={`profile-playlist-badge ${p.isPublic === false ? 'priv' : 'pub'}`}>
                     {p.isPublic === false ? 'Личный' : p.isPublic === true ? 'Публичный (админ)' : 'В каталоге'}
                   </span>
                   {isAdmin && p.isPublic === true && (
-                    <Link to="/admin" className="profile-playlist-admin-link">Редактировать в админке</Link>
+                    <Link to="/admin" className="profile-playlist-admin-link">Админка</Link>
                   )}
-                </div>
-                <div className="profile-playlist-actions">
+                  <button
+                    type="button"
+                    className="profile-pl-cover"
+                    disabled={!!playlistCoverUploadingId}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      openPlaylistCoverPicker(p._id);
+                    }}
+                  >
+                    {playlistCoverUploadingId === p._id ? '...' : 'Обложка'}
+                  </button>
                   {p.isPublic !== true && (
                   <button
                     type="button"
                     className="profile-pl-delete"
                     disabled={deletingPlaylistId === p._id}
-                    onClick={() => handleDeletePlaylist(p._id)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleDeletePlaylist(p._id);
+                    }}
                   >
                     {deletingPlaylistId === p._id ? '...' : 'Удалить'}
                   </button>
                   )}
                 </div>
-              </li>
+              </div>
             ))}
-          </ul>
+          </div>
         )}
       </section>
 
@@ -434,7 +519,7 @@ export default function Profile() {
                 showPendingCoverBadge={t.coverChangeStatus === 'pending' && !!t.coverImagePending}
               />
               <div className="my-track-actions">
-                {t.status === 'approved' && (
+                {(t.status === 'approved' || t.status === 'pending') && (
                   <button
                     type="button"
                     className="my-track-cover"
@@ -472,6 +557,7 @@ export default function Profile() {
           margin-bottom: 14px;
         }
         .profile-playlist-flash { color: #69db7c; margin-bottom: 12px; font-size: 0.95rem; }
+        .profile-playlist-cover-error { color: #ff6b6b; margin-bottom: 12px; font-size: 0.9rem; }
         .profile-playlist-create {
           display: flex;
           flex-wrap: wrap;
@@ -488,49 +574,78 @@ export default function Profile() {
           background: rgba(0,0,0,0.25);
           color: var(--text);
         }
-        .profile-playlist-check {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          font-size: 0.9rem;
-          color: var(--text-dim);
-          cursor: pointer;
-        }
         .profile-playlist-create-btn { margin-left: auto; }
         .profile-playlists-loading { color: var(--text-dim); margin-bottom: 12px; }
         .profile-playlists-empty { text-align: left; padding: 16px 0; }
-        .profile-playlist-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
-        .profile-playlist-row {
+        .profile-playlist-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+          gap: 18px;
+        }
+        .profile-playlist-card {
+          display: flex;
+          flex-direction: column;
+          border-radius: 12px;
+          overflow: hidden;
+          border: 1px solid rgba(211, 0, 197, 0.28);
+          background: rgba(0,0,0,0.2);
+          transition: box-shadow 0.2s;
+        }
+        .profile-playlist-card:hover { box-shadow: 0 0 22px rgba(211, 0, 197, 0.25); }
+        .profile-playlist-card-hit {
+          display: block;
+          text-decoration: none;
+          color: inherit;
+        }
+        .profile-playlist-card-cover {
+          aspect-ratio: 1;
+          width: 100%;
+          background-size: cover;
+          background-position: center;
+        }
+        .profile-playlist-card-title {
+          display: block;
+          padding: 10px 10px 6px;
+          font-family: var(--font-display);
+          font-size: 0.92rem;
+          line-height: 1.25;
+          color: var(--neon-cyan);
+          font-weight: 600;
+        }
+        .profile-playlist-card-footer {
           display: flex;
           flex-wrap: wrap;
-          justify-content: space-between;
-          gap: 12px;
           align-items: center;
-          padding: 12px 14px;
-          border: 1px solid rgba(5, 217, 232, 0.2);
-          border-radius: 12px;
-          background: rgba(0,0,0,0.2);
+          gap: 6px 8px;
+          padding: 0 8px 10px;
         }
-        .profile-playlist-main { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-        .profile-playlist-link { color: var(--neon-cyan); font-weight: 600; text-decoration: none; }
-        .profile-playlist-link:hover { text-decoration: underline; }
         .profile-playlist-badge {
-          font-size: 0.75rem;
-          padding: 2px 8px;
+          font-size: 0.68rem;
+          padding: 2px 7px;
           border-radius: 999px;
           border: 1px solid rgba(255, 200, 0, 0.35);
         }
         .profile-playlist-badge.pub { color: #69db7c; border-color: rgba(0, 255, 100, 0.35); }
         .profile-playlist-badge.priv { color: #ffc800; }
-        .profile-playlist-actions { display: flex; gap: 8px; flex-wrap: wrap; }
         .profile-playlist-admin-link {
-          font-size: 0.8rem;
+          font-size: 0.72rem;
           color: var(--neon-pink);
           text-decoration: underline;
         }
+        .profile-pl-cover {
+          padding: 5px 10px;
+          font-size: 0.78rem;
+          border: 1px solid rgba(5, 217, 232, 0.45);
+          background: transparent;
+          color: var(--neon-cyan);
+          border-radius: 8px;
+        }
+        .profile-pl-cover:hover:not(:disabled) { background: rgba(5, 217, 232, 0.1); }
+        .profile-pl-cover:disabled { opacity: 0.6; }
         .profile-pl-delete {
-          padding: 6px 12px;
-          font-size: 0.85rem;
+          margin-left: auto;
+          padding: 5px 10px;
+          font-size: 0.78rem;
           border: 1px solid rgba(255, 80, 80, 0.5);
           background: transparent;
           color: #ff6b6b;
