@@ -38,7 +38,10 @@ export default function Home() {
       )}
       {playlistList.length > 0 && (
         <section>
-          <h3 className="section-title">Плейлисты</h3>
+          <div className="section-head">
+            <h3 className="section-title">Плейлисты</h3>
+            <Link to="/playlists" className="neon-btn section-head-link">Все плейлисты</Link>
+          </div>
           <div className="playlist-grid">
             {playlistList.map((p) => (
               <Link key={p._id} to={`/playlist/${p._id}`} className="playlist-card">
@@ -49,9 +52,6 @@ export default function Home() {
                 <span className="playlist-title">{p.title}</span>
               </Link>
             ))}
-          </div>
-          <div className="section-more">
-            <Link to="/playlists" className="neon-btn">Все плейлисты</Link>
           </div>
         </section>
       )}
@@ -112,6 +112,22 @@ export default function Home() {
           margin-bottom: 20px;
           padding-left: 4px;
         }
+        .section-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          margin-bottom: 14px;
+        }
+        .section-head .section-title {
+          margin-bottom: 0;
+          padding-left: 4px;
+        }
+        .section-head-link {
+          padding: 8px 14px;
+          font-size: 0.85rem;
+          white-space: nowrap;
+        }
         .track-grid {
           display: grid;
           grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
@@ -142,7 +158,6 @@ export default function Home() {
           font-family: var(--font-display);
           color: var(--neon-cyan);
         }
-        .section-more { margin-top: 24px; text-align: center; }
         .neon-btn {
           display: inline-block;
           padding: 10px 24px;
@@ -155,6 +170,12 @@ export default function Home() {
         .neon-btn:hover {
           background: rgba(5, 217, 232, 0.2);
           box-shadow: var(--glow-cyan);
+        }
+        @media (max-width: 600px) {
+          .section-head {
+            flex-wrap: wrap;
+            align-items: flex-start;
+          }
         }
       `}</style>
     </motion.div>
