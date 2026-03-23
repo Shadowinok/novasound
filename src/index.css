@@ -1,4 +1,6 @@
 :root {
+  /** Полоска «О проекте / Правила» у нижнего края экрана — плеер сдвигается вверх на эту величину */
+  --footer-dock-height: 30px;
   --bg-dark: #0a0a0f;
   --bg-card: rgba(15, 15, 25, 0.85);
   --neon-pink: #ff2a6d;
@@ -62,26 +64,11 @@ h1, h2, h3 {
   background: var(--neon-purple);
   border-radius: 4px;
 }
-.radial-menu {
-  left: 40px !important;      /* как близко к левому краю */
-  top: 80px !important;       /* отступ сверху */
-  bottom: auto !important;    /* отключаем старый bottom */
-  transform: none !important; /* убираем сдвиг по Y */
-}
 
-@media (max-width: 768px) {
-  .radial-menu {
-    left: max(8px, env(safe-area-inset-left, 0px)) !important;
-    top: max(72px, env(safe-area-inset-top, 0px) + 56px) !important;
-  }
-}
+/* Позиция радиального меню — только в RadialMenu.jsx (.radial-menu--desktop / --mobile), иначе дубли с index.css ломают отступы (напр. лишние 40px слева). */
 
 @media (max-width: 480px) {
   body {
     font-size: 0.95rem;
-  }
-  .radial-menu {
-    left: 6px !important;
-    top: max(68px, env(safe-area-inset-top, 0px) + 52px) !important;
   }
 }
