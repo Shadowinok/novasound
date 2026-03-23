@@ -7,7 +7,14 @@ import { usePlayer } from '../context/PlayerContext';
 import { useAuth } from '../context/AuthContext';
 import client, { playlists as playlistsApi } from '../api/client';
 
-export default function TrackCard({ track, showStatus, coverDisplayUrl, showPendingCoverBadge }) {
+export default function TrackCard({
+  track,
+  showStatus,
+  coverDisplayUrl,
+  showPendingCoverBadge,
+  playQueue,
+  playQueueIndex
+}) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { loadTrack, currentTrack, playing } = usePlayer();
@@ -40,7 +47,11 @@ export default function TrackCard({ track, showStatus, coverDisplayUrl, showPend
       navigate('/login');
       return;
     }
-    loadTrack(track);
+    if (Array.isArray(playQueue) && playQueue.length > 0) {
+      loadTrack(track, { queue: playQueue, startIndex: Number.isFinite(playQueueIndex) ? playQueueIndex : undefined });
+    } else {
+      loadTrack(track);
+    }
   };
 
   const ensureAuth = () => {

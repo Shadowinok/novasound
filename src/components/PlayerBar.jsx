@@ -3,7 +3,23 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { usePlayer } from '../context/PlayerContext';
 
 export default function PlayerBar() {
-  const { currentTrack, playing, progress, duration, volume, togglePlay, seek, setPlayerVolume, closePlayer } = usePlayer();
+  const {
+    currentTrack,
+    playing,
+    progress,
+    duration,
+    volume,
+    queue,
+    queueIndex,
+    repeatMode,
+    togglePlay,
+    playNext,
+    playPrev,
+    cycleRepeatMode,
+    seek,
+    setPlayerVolume,
+    closePlayer
+  } = usePlayer();
   const [volumeOpen, setVolumeOpen] = useState(false);
   const volumeWrapRef = useRef(null);
 
@@ -29,6 +45,15 @@ export default function PlayerBar() {
 
   const volPct = Math.round((volume || 0) * 100);
   const volumeIcon = volPct === 0 ? '🔇' : volPct < 40 ? '🔉' : '🔊';
+  const canPrev = queueIndex > 0 || repeatMode === 'all-repeat';
+  const canNext = queueIndex < (queue.length - 1) || repeatMode === 'all-repeat';
+  const repeatLabel = repeatMode === 'one'
+    ? '1'
+    : repeatMode === 'one-repeat'
+      ? '↻1'
+      : repeatMode === 'all'
+        ? 'all'
+        : '↻all';
 
   const formatTime = (s) => {
     if (!s || isNaN(s)) return '0:00';
@@ -58,8 +83,23 @@ export default function PlayerBar() {
           </div>
         </div>
         <div className="player-controls">
+          <button type="button" className="player-btn nav-btn" onClick={playPrev} disabled={!canPrev} aria-label="Предыдущий трек">
+            ⏮
+          </button>
           <button type="button" className="player-btn play-pause" onClick={togglePlay}>
             {playing ? '⏸' : '▶'}
+          </button>
+          <button type="button" className="player-btn nav-btn" onClick={playNext} disabled={!canNext} aria-label="Следующий трек">
+            ⏭
+          </button>
+          <button
+            type="button"
+            className={`player-btn repeat-btn mode-${repeatMode}`}
+            onClick={cycleRepeatMode}
+            aria-label="Режим повтора"
+            title="Режим повтора"
+          >
+            {repeatLabel}
           </button>
           <span className="player-time">{formatTime(progress)}</span>
           <input
@@ -262,8 +302,34 @@ export default function PlayerBar() {
             justify-content: center;
             box-shadow: 0 0 20px rgba(255, 42, 109, 0.4);
           }
+          .player-btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+            box-shadow: none;
+          }
           .player-btn:hover {
             background: rgba(255, 42, 109, 0.3);
+          }
+          .repeat-btn {
+            min-width: 52px;
+            width: auto;
+            border-radius: 999px;
+            padding: 0 10px;
+            font-size: 0.9rem;
+            font-family: var(--font-display);
+            letter-spacing: 0.02em;
+          }
+          .repeat-btn.mode-one, .repeat-btn.mode-all {
+            border-color: rgba(5, 217, 232, 0.6);
+            color: var(--neon-cyan);
+            background: rgba(5, 217, 232, 0.12);
+            box-shadow: 0 0 12px rgba(5, 217, 232, 0.18);
+          }
+          .repeat-btn.mode-one-repeat, .repeat-btn.mode-all-repeat {
+            border-color: rgba(255, 200, 0, 0.7);
+            color: #ffd65a;
+            background: rgba(255, 200, 0, 0.16);
+            box-shadow: 0 0 12px rgba(255, 200, 0, 0.18);
           }
           .player-time {
             font-size: 0.85rem;
