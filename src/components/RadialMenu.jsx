@@ -20,11 +20,11 @@ export default function RadialMenu({ user, isAdmin }) {
     if (i.auth && !user) return false;
     return true;
   });
-  const radius = 92;
+  const radius = 124;
   const count = filtered.length;
-  const angleStep = (Math.PI * 0.5) / Math.max(1, count - 1);
-  const startAngle = Math.PI * 0.08;
-  const itemSize = 50;
+  const angleStep = (Math.PI * 0.64) / Math.max(1, count - 1);
+  const startAngle = -Math.PI * 0.58;
+  const itemSize = 44;
   const half = itemSize / 2;
   const toggleSize = 82;
   const toggleCenter = toggleSize / 2;
@@ -88,7 +88,7 @@ export default function RadialMenu({ user, isAdmin }) {
       <style>{`
         .radial-menu {
           position: fixed;
-          top: calc(16px + env(safe-area-inset-top, 0px));
+          top: calc(42px + env(safe-area-inset-top, 0px));
           left: 16px;
           z-index: 120;
           width: min(78vw, 260px);
@@ -154,7 +154,7 @@ export default function RadialMenu({ user, isAdmin }) {
 
         @media (max-width: 768px) {
           .radial-menu {
-            top: calc(10px + env(safe-area-inset-top, 0px));
+            top: calc(34px + env(safe-area-inset-top, 0px));
             left: 10px;
             width: min(86vw, 230px);
             height: min(56vh, 230px);
