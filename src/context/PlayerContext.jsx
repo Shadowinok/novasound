@@ -29,6 +29,8 @@ export function PlayerProvider({ children }) {
   const queueRef = useRef([]);
   const queueIndexRef = useRef(0);
   const repeatModeRef = useRef('all');
+  const seekHoldUntilRef = useRef(0);
+  const seekTargetRef = useRef(0);
 
   const normalizeQueue = useCallback((list, fallbackTrack) => {
     const arr = Array.isArray(list) ? list.filter(Boolean) : [];
@@ -98,6 +100,8 @@ export function PlayerProvider({ children }) {
     setQueue(safeQueue);
     setQueueIndex(safeIndex);
     setCurrentTrack(track);
+    seekHoldUntilRef.current = 0;
+    seekTargetRef.current = 0;
     setProgress(0);
     setDuration(track.duration || 0);
     setPlaying(true);
@@ -173,6 +177,8 @@ export function PlayerProvider({ children }) {
       }
       setCurrentTrack(null);
       setPlaying(false);
+      seekHoldUntilRef.current = 0;
+      seekTargetRef.current = 0;
       setProgress(0);
       setDuration(0);
       setQueue([]);
@@ -216,8 +222,12 @@ export function PlayerProvider({ children }) {
 
   const seek = useCallback((value) => {
     if (!howlRef.current) return;
-    howlRef.current.seek(value);
-    setProgress(value);
+    const next = Math.max(0, Number(value) || 0);
+    seekTargetRef.current = next;
+    // Короткая защита от "отката" UI, пока движок догружает новый offset.
+    seekHoldUntilRef.current = Date.now() + 1200;
+    howlRef.current.seek(next);
+    setProgress(next);
   }, []);
 
   /** Остановить и убрать плеер с экрана */
@@ -228,6 +238,8 @@ export function PlayerProvider({ children }) {
     }
     setCurrentTrack(null);
     setPlaying(false);
+    seekHoldUntilRef.current = 0;
+    seekTargetRef.current = 0;
     setProgress(0);
     setDuration(0);
       setQueue([]);
@@ -244,7 +256,16 @@ export function PlayerProvider({ children }) {
       const h = howlRef.current;
       if (!h) return;
       const pos = h.seek();
-      if (typeof pos === 'number' && !Number.isNaN(pos)) setProgress(pos);
+      if (typeof pos !== 'number' || Number.isNaN(pos)) return;
+      const now = Date.now();
+      if (now < seekHoldUntilRef.current && pos + 0.2 < seekTargetRef.current) {
+        setProgress(seekTargetRef.current);
+        return;
+      }
+      setProgress(pos);
+      if (pos + 0.2 >= seekTargetRef.current) {
+        seekHoldUntilRef.current = 0;
+      }
     };
     const id = setInterval(tick, 500);
     return () => clearInterval(id);
