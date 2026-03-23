@@ -16,14 +16,27 @@ export function PlayerProvider({ children }) {
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [queue, setQueue] = useState([]);
+  const [queueIndex, setQueueIndex] = useState(0);
+  // one | one-repeat | all | all-repeat
+  const [repeatMode, setRepeatMode] = useState('all');
   const [volume, setVolume] = useState(() => {
     const saved = Number(localStorage.getItem('novasound_volume'));
     if (Number.isFinite(saved) && saved >= 0 && saved <= 1) return saved;
     return 1;
   });
   const howlRef = useRef(null);
+  const queueRef = useRef([]);
+  const queueIndexRef = useRef(0);
+  const repeatModeRef = useRef('all');
 
-  const loadTrack = useCallback((track) => {
+  const normalizeQueue = useCallback((list, fallbackTrack) => {
+    const arr = Array.isArray(list) ? list.filter(Boolean) : [];
+    if (arr.length > 0) return arr;
+    return fallbackTrack ? [fallbackTrack] : [];
+  }, []);
+
+  const playQueueTrack = useCallback((track, nextQueue, nextIndex) => {
     if (howlRef.current) {
       howlRef.current.unload();
       howlRef.current = null;
@@ -46,6 +59,31 @@ export function PlayerProvider({ children }) {
       volume,
       onload: () => setDuration(howl.duration()),
       onend: () => {
+        const mode = repeatModeRef.current;
+        const q = queueRef.current;
+        const idx = queueIndexRef.current;
+        if (mode === 'one-repeat') {
+          howl.seek(0);
+          howl.play();
+          return;
+        }
+        if (mode === 'one') {
+          setPlaying(false);
+          setProgress(0);
+          return;
+        }
+        const nextIdx = idx + 1;
+        if (nextIdx < q.length) {
+          const nextTrack = q[nextIdx];
+          if (nextTrack) {
+            playQueueTrack(nextTrack, q, nextIdx);
+            return;
+          }
+        }
+        if (mode === 'all-repeat' && q.length > 0) {
+          playQueueTrack(q[0], q, 0);
+          return;
+        }
         setPlaying(false);
         setProgress(0);
       },
@@ -53,13 +91,79 @@ export function PlayerProvider({ children }) {
       onpause: () => setPlaying(false)
     });
     howlRef.current = howl;
+    const safeQueue = normalizeQueue(nextQueue, track);
+    const safeIndex = Math.max(0, Math.min(nextIndex, safeQueue.length - 1));
+    queueRef.current = safeQueue;
+    queueIndexRef.current = safeIndex;
+    setQueue(safeQueue);
+    setQueueIndex(safeIndex);
     setCurrentTrack(track);
     setProgress(0);
     setDuration(track.duration || 0);
     setPlaying(true);
     howl.play();
     tracksApi.play(track._id).catch(() => {});
-  }, [volume]);
+  }, [normalizeQueue, volume]);
+
+  const loadTrack = useCallback((track, options = {}) => {
+    if (!track) {
+      playQueueTrack(null, [], 0);
+      return;
+    }
+    const q = normalizeQueue(options.queue, track);
+    let idx = Number.isFinite(options.startIndex) ? Number(options.startIndex) : q.findIndex((t) => String(t?._id) === String(track._id));
+    if (idx < 0) idx = 0;
+    playQueueTrack(q[idx] || track, q, idx);
+  }, [normalizeQueue, playQueueTrack]);
+
+  const playNext = useCallback(() => {
+    const q = queueRef.current;
+    const idx = queueIndexRef.current;
+    if (!q.length) return;
+    const nextIdx = idx + 1;
+    if (nextIdx < q.length) {
+      playQueueTrack(q[nextIdx], q, nextIdx);
+      return;
+    }
+    if (repeatModeRef.current === 'all-repeat') {
+      playQueueTrack(q[0], q, 0);
+    }
+  }, [playQueueTrack]);
+
+  const playPrev = useCallback(() => {
+    const q = queueRef.current;
+    const idx = queueIndexRef.current;
+    if (!q.length) return;
+    const h = howlRef.current;
+    const pos = h ? Number(h.seek()) : 0;
+    if (pos > 3) {
+      if (h) h.seek(0);
+      setProgress(0);
+      return;
+    }
+    const prevIdx = idx - 1;
+    if (prevIdx >= 0) {
+      playQueueTrack(q[prevIdx], q, prevIdx);
+      return;
+    }
+    if (repeatModeRef.current === 'all-repeat') {
+      const lastIdx = q.length - 1;
+      playQueueTrack(q[lastIdx], q, lastIdx);
+    }
+  }, [playQueueTrack]);
+
+  const cycleRepeatMode = useCallback(() => {
+    setRepeatMode((prev) => {
+      if (prev === 'one') return 'one-repeat';
+      if (prev === 'one-repeat') return 'all';
+      if (prev === 'all') return 'all-repeat';
+      return 'one';
+    });
+  }, []);
+
+  useEffect(() => {
+    repeatModeRef.current = repeatMode;
+  }, [repeatMode]);
 
   useEffect(() => {
     const clearPlayer = () => {
@@ -71,6 +175,10 @@ export function PlayerProvider({ children }) {
       setPlaying(false);
       setProgress(0);
       setDuration(0);
+      setQueue([]);
+      setQueueIndex(0);
+      queueRef.current = [];
+      queueIndexRef.current = 0;
     };
     window.addEventListener('auth_logout', clearPlayer);
     return () => window.removeEventListener('auth_logout', clearPlayer);
@@ -122,6 +230,10 @@ export function PlayerProvider({ children }) {
     setPlaying(false);
     setProgress(0);
     setDuration(0);
+      setQueue([]);
+      setQueueIndex(0);
+      queueRef.current = [];
+      queueIndexRef.current = 0;
   }, []);
 
   // Только currentTrack — иначе при паузе/плей эффект пересоздаётся и на части браузеров глючит HTML5 Audio
@@ -144,9 +256,15 @@ export function PlayerProvider({ children }) {
       playing,
       progress,
       duration,
+      queue,
+      queueIndex,
+      repeatMode,
       volume,
       loadTrack,
       togglePlay,
+      playNext,
+      playPrev,
+      cycleRepeatMode,
       seek,
       setPlayerVolume,
       setProgress,
