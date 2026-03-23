@@ -40,10 +40,7 @@ export default function Home() {
       </section>
       {playlistList.length > 0 && (
         <section>
-          <div className="section-head">
-            <h3 className="section-title">Плейлисты</h3>
-            <Link to="/playlists" className="neon-btn section-head-link">Все плейлисты</Link>
-          </div>
+          <h3 className="section-title">Плейлисты</h3>
           <div className="playlist-grid">
             {playlistList.map((p) => (
               <Link key={p._id} to={`/playlist/${p._id}`} className="playlist-card">
@@ -124,22 +121,6 @@ export default function Home() {
           margin-bottom: 20px;
           padding-left: 4px;
         }
-        .section-head {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-          margin-bottom: 14px;
-        }
-        .section-head .section-title {
-          margin-bottom: 0;
-          padding-left: 4px;
-        }
-        .section-head-link {
-          padding: 8px 14px;
-          font-size: 0.85rem;
-          white-space: nowrap;
-        }
         .track-grid {
           display: grid;
           grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
@@ -182,12 +163,6 @@ export default function Home() {
         .neon-btn:hover {
           background: rgba(5, 217, 232, 0.2);
           box-shadow: var(--glow-cyan);
-        }
-        @media (max-width: 600px) {
-          .section-head {
-            flex-wrap: wrap;
-            align-items: flex-start;
-          }
         }
       `}</style>
     </motion.div>
