@@ -24,6 +24,36 @@ export default function PlayerBar() {
   const [isSeeking, setIsSeeking] = useState(false);
   const [seekDraft, setSeekDraft] = useState(0);
   const volumeWrapRef = useRef(null);
+  const seekDraftRef = useRef(0);
+
+  const commitSeek = (value) => {
+    if (!(duration > 0)) return;
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return;
+    seek(numeric);
+    setSeekDraft(numeric);
+    seekDraftRef.current = numeric;
+  };
+
+  useEffect(() => {
+    seekDraftRef.current = seekDraft;
+  }, [seekDraft]);
+
+  useEffect(() => {
+    if (!isSeeking) return undefined;
+    const finishSeek = () => {
+      commitSeek(seekDraftRef.current);
+      setIsSeeking(false);
+    };
+    window.addEventListener('mouseup', finishSeek);
+    window.addEventListener('touchend', finishSeek, { passive: true });
+    window.addEventListener('touchcancel', finishSeek, { passive: true });
+    return () => {
+      window.removeEventListener('mouseup', finishSeek);
+      window.removeEventListener('touchend', finishSeek);
+      window.removeEventListener('touchcancel', finishSeek);
+    };
+  }, [isSeeking]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!volumeOpen) return;
@@ -108,6 +138,7 @@ export default function PlayerBar() {
               const v = Number(e.target.value);
               if (!Number.isFinite(v)) return;
               setSeekDraft(v);
+              seekDraftRef.current = v;
               if (!isSeeking && duration > 0) seek(v);
             }}
             onMouseDown={(e) => {
@@ -120,12 +151,14 @@ export default function PlayerBar() {
               setIsSeeking(true);
               setSeekDraft(sliderValue);
             }}
-            onMouseUp={() => {
-              if (duration > 0) seek(seekDraft);
+            onMouseUp={(e) => {
+              e.stopPropagation();
+              commitSeek(e.currentTarget.value);
               setIsSeeking(false);
             }}
-            onTouchEnd={() => {
-              if (duration > 0) seek(seekDraft);
+            onTouchEnd={(e) => {
+              e.stopPropagation();
+              commitSeek(seekDraftRef.current);
               setIsSeeking(false);
             }}
             onKeyDown={(e) => {
@@ -134,7 +167,7 @@ export default function PlayerBar() {
               }
             }}
             onKeyUp={() => {
-              if (duration > 0) seek(seekDraft);
+              commitSeek(seekDraftRef.current);
               setIsSeeking(false);
             }}
             className="player-slider"
