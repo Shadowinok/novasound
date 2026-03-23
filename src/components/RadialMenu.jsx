@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { usePlayer } from '../context/PlayerContext';
 
 const items = [
   { path: '/', label: 'Главная', icon: '⌂' },
@@ -16,24 +15,22 @@ const items = [
 export default function RadialMenu({ user, isAdmin }) {
   const [open, setOpen] = useState(false);
   const location = useLocation();
-  const { currentTrack } = usePlayer();
   const filtered = items.filter(i => {
     if (i.admin && !isAdmin) return false;
     if (i.auth && !user) return false;
     return true;
   });
-  /** Дуга пунктов (px). Раньше было дублирование margin + transform — края вылезали за экран. */
-  const radius = 84;
+  /** Дуга раскрытия в правый-нижний сектор, чтобы в левом верхнем углу ничего не обрезалось. */
+  const radius = 96;
   const count = filtered.length;
-  const angleStep = (Math.PI * 0.85) / Math.max(1, count - 1);
-  const startAngle = -Math.PI * 0.1;
+  const angleStep = (Math.PI * 0.36) / Math.max(1, count - 1);
+  const startAngle = Math.PI * 0.08;
   const itemSize = 48;
   const half = itemSize / 2;
 
   return (
     <nav
       className="radial-menu"
-      data-player-active={currentTrack ? 'true' : 'false'}
       aria-label="Основная навигация"
     >
       <AnimatePresence>
@@ -90,13 +87,10 @@ export default function RadialMenu({ user, isAdmin }) {
       <style>{`
         .radial-menu {
           position: fixed;
-          bottom: calc(24px + var(--footer-dock-height, 30px) + env(safe-area-inset-bottom, 0px));
-          left: 50%;
-          transform: translateX(-50%);
-          /* 2 * radius + item + запас, чтобы «Кабинет» и крайние пункты не резались */
-          width: min(92vw, 300px);
-          height: min(42vw, 200px);
-          max-height: 220px;
+          top: calc(10px + env(safe-area-inset-top, 0px));
+          left: 10px;
+          width: min(92vw, 240px);
+          height: min(80vh, 240px);
           z-index: 100;
           display: flex;
           align-items: center;
@@ -106,28 +100,6 @@ export default function RadialMenu({ user, isAdmin }) {
         .radial-menu .radial-toggle,
         .radial-menu .radial-menu-node {
           pointer-events: auto;
-        }
-        /* Когда плеер открыт — поднимаем меню над полосой плеера, не перекрываем кнопки */
-        .radial-menu[data-player-active="true"] {
-          bottom: calc(96px + var(--footer-dock-height, 30px) + env(safe-area-inset-bottom, 0px));
-        }
-        @media (max-width: 768px) {
-          .radial-menu[data-player-active="true"] {
-            bottom: calc(108px + var(--footer-dock-height, 30px) + env(safe-area-inset-bottom, 0px));
-          }
-        }
-        @media (orientation: landscape) and (max-height: 500px) {
-          .radial-menu {
-            left: auto;
-            right: 10px;
-            transform: none;
-            bottom: calc(12px + var(--footer-dock-height, 30px) + env(safe-area-inset-bottom, 0px));
-            width: 120px;
-            height: 120px;
-          }
-          .radial-menu[data-player-active="true"] {
-            bottom: calc(72px + var(--footer-dock-height, 30px) + env(safe-area-inset-bottom, 0px));
-          }
         }
         .radial-toggle {
           width: 100px;
@@ -172,7 +144,24 @@ export default function RadialMenu({ user, isAdmin }) {
         .radial-icon { font-size: 1.1rem; }
         .radial-label { margin-top: 2px; }
         @media (max-width: 768px) {
+          .radial-menu {
+            left: 8px;
+            top: calc(8px + env(safe-area-inset-top, 0px));
+            width: min(95vw, 220px);
+            height: min(68vh, 220px);
+          }
           .radial-toggle { width: 80px; height: 80px; font-size: 0.75rem; }
+        }
+        @media (orientation: landscape) and (max-height: 500px) {
+          .radial-menu {
+            width: 200px;
+            height: 180px;
+          }
+          .radial-toggle {
+            width: 72px;
+            height: 72px;
+            font-size: 0.7rem;
+          }
         }
       `}</style>
     </nav>
