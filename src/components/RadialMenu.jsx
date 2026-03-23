@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { usePlayer } from '../context/PlayerContext';
 
 const items = [
   { path: '/', label: 'Главная', icon: '⌂' },
@@ -16,26 +15,18 @@ const items = [
 export default function RadialMenu({ user, isAdmin }) {
   const [open, setOpen] = useState(false);
   const location = useLocation();
-  const { currentTrack } = usePlayer();
   const filtered = items.filter(i => {
     if (i.admin && !isAdmin) return false;
     if (i.auth && !user) return false;
     return true;
   });
-  /** Дуга пунктов (px). Раньше было дублирование margin + transform — края вылезали за экран. */
-  const radius = 84;
+  const radius = 72;
   const count = filtered.length;
   const angleStep = (Math.PI * 0.85) / Math.max(1, count - 1);
   const startAngle = -Math.PI * 0.1;
-  const itemSize = 48;
-  const half = itemSize / 2;
 
   return (
-    <nav
-      className="radial-menu"
-      data-player-active={currentTrack ? 'true' : 'false'}
-      aria-label="Основная навигация"
-    >
+    <nav className="radial-menu">
       <AnimatePresence>
         {open && (
           <>
@@ -47,20 +38,11 @@ export default function RadialMenu({ user, isAdmin }) {
               return (
                 <motion.div
                   key={ item.path }
-                  className="radial-menu-node"
                   initial={{ opacity: 0, scale: 0, x: 0, y: 0 }}
                   animate={{ opacity: 1, scale: 1, x, y }}
                   exit={{ opacity: 0, scale: 0, x: 0, y: 0 }}
-                  transition={{ type: 'spring', stiffness: 260, damping: 22 }}
-                  style={{
-                    position: 'absolute',
-                    left: '50%',
-                    top: '50%',
-                    width: itemSize,
-                    height: itemSize,
-                    marginLeft: -half,
-                    marginTop: -half
-                  }}
+                  transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+                  style={{ position: 'absolute', left: '50%', top: '50%', marginLeft: x, marginTop: y }}
                 >
                   <Link
                     to={item.path}
@@ -90,44 +72,15 @@ export default function RadialMenu({ user, isAdmin }) {
       <style>{`
         .radial-menu {
           position: fixed;
-          bottom: calc(24px + var(--footer-dock-height, 30px) + env(safe-area-inset-bottom, 0px));
+          bottom: calc(24px + var(--footer-dock-height, 30px));
           left: 50%;
           transform: translateX(-50%);
-          /* 2 * radius + item + запас, чтобы «Кабинет» и крайние пункты не резались */
-          width: min(92vw, 300px);
-          height: min(42vw, 200px);
-          max-height: 220px;
+          width: 180px;
+          height: 120px;
           z-index: 100;
           display: flex;
           align-items: center;
           justify-content: center;
-          pointer-events: none;
-        }
-        .radial-menu .radial-toggle,
-        .radial-menu .radial-menu-node {
-          pointer-events: auto;
-        }
-        /* Когда плеер открыт — поднимаем меню над полосой плеера, не перекрываем кнопки */
-        .radial-menu[data-player-active="true"] {
-          bottom: calc(96px + var(--footer-dock-height, 30px) + env(safe-area-inset-bottom, 0px));
-        }
-        @media (max-width: 768px) {
-          .radial-menu[data-player-active="true"] {
-            bottom: calc(108px + var(--footer-dock-height, 30px) + env(safe-area-inset-bottom, 0px));
-          }
-        }
-        @media (orientation: landscape) and (max-height: 500px) {
-          .radial-menu {
-            left: auto;
-            right: 10px;
-            transform: none;
-            bottom: calc(12px + var(--footer-dock-height, 30px) + env(safe-area-inset-bottom, 0px));
-            width: 120px;
-            height: 120px;
-          }
-          .radial-menu[data-player-active="true"] {
-            bottom: calc(72px + var(--footer-dock-height, 30px) + env(safe-area-inset-bottom, 0px));
-          }
         }
         .radial-toggle {
           width: 100px;
@@ -172,6 +125,7 @@ export default function RadialMenu({ user, isAdmin }) {
         .radial-icon { font-size: 1.1rem; }
         .radial-label { margin-top: 2px; }
         @media (max-width: 768px) {
+          .radial-menu { width: 140px; height: 100px; }
           .radial-toggle { width: 80px; height: 80px; font-size: 0.75rem; }
         }
       `}</style>
