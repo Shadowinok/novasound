@@ -20,9 +20,27 @@ export default function RadialMenu({ user, isAdmin }) {
     if (i.auth && !user) return false;
     return true;
   });
-  const radius = 72;
   const count = filtered.length;
-  const angleStep = (Math.PI * 0.85) / Math.max(1, count - 1);
+  const n = Math.max(1, count - 1);
+  /** Диаметр кружка в px (как в CSS .radial-item) */
+  const itemSize = 42;
+  const half = itemSize / 2;
+  /** ~1 мм между краями на типичном экране (~3–4 px) */
+  const gapPx = 4;
+  const chord = itemSize + gapPx;
+  /**
+   * Широкая дуга (~320°), иначе при узком секторе математика требует огромный R,
+   * чтобы не перекрывать кружки при заданном зазоре.
+   */
+  const arcSpan = 2 * Math.PI * 0.89;
+  const angleStep = arcSpan / n;
+  const sinHalf = Math.sin(angleStep / 2);
+  /**
+   * Расстояние от центра кнопки NovaSound до центров кружков:
+   * chord = 2 * R * sin(Δθ/2)  =>  R = chord / (2*sin(Δθ/2))
+   * Так зазор между кружками ≈ gapPx при заданном угле.
+   */
+  const radius = sinHalf > 1e-6 ? chord / (2 * sinHalf) : 58;
   const startAngle = -Math.PI * 0.1;
 
   return (
@@ -43,7 +61,15 @@ export default function RadialMenu({ user, isAdmin }) {
                     animate={{ opacity: 1, scale: 1, x, y }}
                     exit={{ opacity: 0, scale: 0, x: 0, y: 0 }}
                     transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-                    style={{ position: 'absolute', left: '50%', top: '50%', marginLeft: x, marginTop: y }}
+                    style={{
+                      position: 'absolute',
+                      left: '50%',
+                      top: '50%',
+                      width: itemSize,
+                      height: itemSize,
+                      marginLeft: -half,
+                      marginTop: -half
+                    }}
                   >
                     <Link
                       to={item.path}
@@ -109,8 +135,8 @@ export default function RadialMenu({ user, isAdmin }) {
           position: absolute;
           left: 0;
           top: 0;
-          width: 48px;
-          height: 48px;
+          width: 42px;
+          height: 42px;
           border-radius: 50%;
           background: var(--bg-card);
           border: 1px solid var(--neon-purple);
@@ -128,8 +154,8 @@ export default function RadialMenu({ user, isAdmin }) {
           box-shadow: var(--glow-pink);
           color: var(--neon-pink);
         }
-        .radial-icon { font-size: 1.1rem; }
-        .radial-label { margin-top: 2px; }
+        .radial-icon { font-size: 1rem; }
+        .radial-label { margin-top: 1px; font-size: 0.62rem; }
         @media (max-width: 768px) {
           .radial-menu { width: 140px; height: 100px; }
           .radial-toggle { width: 80px; height: 80px; font-size: 0.75rem; }
