@@ -15,7 +15,7 @@ function isPlaylistOwner(playlist, user) {
 export default function PlaylistPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [playlist, setPlaylist] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -41,6 +41,7 @@ export default function PlaylistPage() {
 
   const owner = playlist && isPlaylistOwner(playlist, user);
   const isPrivate = playlist && playlist.isPublic === false;
+  const isPublicEditorial = playlist && playlist.isPublic === true;
 
   const handleDelete = () => {
     if (!owner || !playlist) return;
@@ -54,21 +55,6 @@ export default function PlaylistPage() {
         navigate('/profile');
       })
       .catch((e) => setOwnerMsg(e.response?.data?.message || 'Не удалось удалить'))
-      .finally(() => setOwnerBusy(false));
-  };
-
-  const handleTogglePublic = () => {
-    if (!owner || !playlist) return;
-    const next = !(playlist.isPublic !== false);
-    setOwnerBusy(true);
-    setOwnerMsg('');
-    playlistsApi
-      .updateMy(playlist._id, { isPublic: next })
-      .then((r) => {
-        setPlaylist(r.data);
-        setOwnerMsg(next ? 'Плейлист виден в каталоге' : 'Плейлист только у вас');
-      })
-      .catch((e) => setOwnerMsg(e.response?.data?.message || 'Не удалось сохранить'))
       .finally(() => setOwnerBusy(false));
   };
 
@@ -118,18 +104,21 @@ export default function PlaylistPage() {
         <div>
           <h1 className="playlist-header-title">
             {playlist.title}
-            {isPrivate && <span className="playlist-privacy-badge">Приватный</span>}
+            {isPrivate && <span className="playlist-privacy-badge">Личный</span>}
+            {!isPrivate && <span className="playlist-privacy-badge pub">В каталоге</span>}
           </h1>
           {playlist.description && <p className="playlist-header-desc">{playlist.description}</p>}
           <p className="playlist-header-meta">Треков: {tracks.length}</p>
           {owner && (
             <div className="playlist-owner-actions">
-              <button type="button" className="playlist-owner-btn" disabled={ownerBusy} onClick={handleTogglePublic}>
-                {playlist.isPublic !== false ? 'Скрыть из каталога' : 'Показать в каталоге'}
-              </button>
+              {isPublicEditorial && isAdmin && (
+                <Link to="/admin" className="playlist-owner-btn">Редактировать в админке</Link>
+              )}
+              {playlist.isPublic !== true && (
               <button type="button" className="playlist-owner-btn danger" disabled={ownerBusy} onClick={handleDelete}>
                 Удалить плейлист
               </button>
+              )}
               <Link to="/profile" className="playlist-owner-link">
                 Личный кабинет
               </Link>
@@ -171,6 +160,10 @@ export default function PlaylistPage() {
           border-radius: 999px;
           border: 1px solid rgba(255, 200, 0, 0.45);
           color: #ffc800;
+        }
+        .playlist-privacy-badge.pub {
+          border-color: rgba(0, 255, 100, 0.4);
+          color: #69db7c;
         }
         .playlist-header-desc, .playlist-header-meta { color: var(--text-dim); margin-bottom: 4px; }
         .playlist-owner-actions {

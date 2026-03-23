@@ -8,7 +8,7 @@ import UploadTrack from '../components/UploadTrack';
 
 export default function Profile() {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { logout, isAdmin } = useAuth();
   const [tracks, setTracks] = useState([]);
   const [statusFilter, setStatusFilter] = useState('');
   const [showUpload, setShowUpload] = useState(false);
@@ -30,10 +30,8 @@ export default function Profile() {
   const [myPlaylists, setMyPlaylists] = useState([]);
   const [playlistsLoading, setPlaylistsLoading] = useState(true);
   const [newPlaylistTitle, setNewPlaylistTitle] = useState('');
-  const [newPlaylistPublic, setNewPlaylistPublic] = useState(false);
   const [playlistFlash, setPlaylistFlash] = useState('');
   const [deletingPlaylistId, setDeletingPlaylistId] = useState('');
-  const [togglingPlaylistId, setTogglingPlaylistId] = useState('');
   const coverInputRef = useRef(null);
   /** Синхронный id трека для обложки — иначе React state не успевает до onChange файла */
   const pendingCoverTrackIdRef = useRef(null);
@@ -91,11 +89,10 @@ export default function Profile() {
   const handleCreatePlaylist = () => {
     if (!newPlaylistTitle.trim()) return;
     playlistsApi
-      .createMy({ title: newPlaylistTitle.trim(), isPublic: newPlaylistPublic })
+      .createMy({ title: newPlaylistTitle.trim() })
       .then((r) => {
         setMyPlaylists((prev) => [r.data, ...prev]);
         setNewPlaylistTitle('');
-        setNewPlaylistPublic(false);
         setPlaylistFlash('Плейлист создан');
       })
       .catch((e) => setPlaylistFlash(e.response?.data?.message || 'Не удалось создать плейлист'));
@@ -113,19 +110,6 @@ export default function Profile() {
       })
       .catch((e) => setPlaylistFlash(e.response?.data?.message || 'Не удалось удалить'))
       .finally(() => setDeletingPlaylistId(''));
-  };
-
-  const handleTogglePlaylistPublic = (p) => {
-    const currentlyPublic = p.isPublic !== false;
-    setTogglingPlaylistId(p._id);
-    playlistsApi
-      .updateMy(p._id, { isPublic: !currentlyPublic })
-      .then((r) => {
-        setMyPlaylists((prev) => prev.map((x) => (x._id === r.data._id ? r.data : x)));
-        setPlaylistFlash(!currentlyPublic ? 'Виден в каталоге' : 'Скрыт из каталога');
-      })
-      .catch((e) => setPlaylistFlash(e.response?.data?.message || 'Ошибка сохранения'))
-      .finally(() => setTogglingPlaylistId(''));
   };
 
   const stats = useMemo(() => {
@@ -260,7 +244,8 @@ export default function Profile() {
       <section className="profile-playlists-section" aria-labelledby="profile-playlists-heading">
         <h3 id="profile-playlists-heading" className="section-title">Мои плейлисты</h3>
         <p className="profile-playlists-hint">
-          По умолчанию плейлист <strong>приватный</strong> — его не видно на главной и в разделе «Плейлисты», пока не включите показ в каталоге (здесь или на странице плейлиста).
+          Здесь создаются только <strong>личные</strong> плейлисты. Публичные подборки для главной и каталога создаются в{' '}
+          <strong>админ-панели</strong> (раздел «Плейлисты»).
         </p>
         {playlistFlash && <div className="profile-playlist-flash">{playlistFlash}</div>}
         <div className="profile-playlist-create">
@@ -271,14 +256,6 @@ export default function Profile() {
             value={newPlaylistTitle}
             onChange={(e) => setNewPlaylistTitle(e.target.value)}
           />
-          <label className="profile-playlist-check">
-            <input
-              type="checkbox"
-              checked={newPlaylistPublic}
-              onChange={(e) => setNewPlaylistPublic(e.target.checked)}
-            />
-            Показать в каталоге и на главной
-          </label>
           <button type="button" className="neon-btn profile-playlist-create-btn" onClick={handleCreatePlaylist}>
             Создать плейлист
           </button>
@@ -295,23 +272,15 @@ export default function Profile() {
                   <Link to={`/playlist/${p._id}`} className="profile-playlist-link">
                     {p.title}
                   </Link>
-                  <span className={`profile-playlist-badge ${p.isPublic !== false ? 'pub' : 'priv'}`}>
-                    {p.isPublic !== false ? 'В каталоге' : 'Приватный'}
+                  <span className={`profile-playlist-badge ${p.isPublic === false ? 'priv' : 'pub'}`}>
+                    {p.isPublic === false ? 'Личный' : p.isPublic === true ? 'Публичный (админ)' : 'В каталоге'}
                   </span>
+                  {isAdmin && p.isPublic === true && (
+                    <Link to="/admin" className="profile-playlist-admin-link">Редактировать в админке</Link>
+                  )}
                 </div>
                 <div className="profile-playlist-actions">
-                  <button
-                    type="button"
-                    className="profile-pl-toggle"
-                    disabled={!!togglingPlaylistId}
-                    onClick={() => handleTogglePlaylistPublic(p)}
-                  >
-                    {togglingPlaylistId === p._id
-                      ? '...'
-                      : p.isPublic !== false
-                        ? 'Скрыть из каталога'
-                        : 'Показать в каталоге'}
-                  </button>
+                  {p.isPublic !== true && (
                   <button
                     type="button"
                     className="profile-pl-delete"
@@ -320,6 +289,7 @@ export default function Profile() {
                   >
                     {deletingPlaylistId === p._id ? '...' : 'Удалить'}
                   </button>
+                  )}
                 </div>
               </li>
             ))}
@@ -553,16 +523,11 @@ export default function Profile() {
         .profile-playlist-badge.pub { color: #69db7c; border-color: rgba(0, 255, 100, 0.35); }
         .profile-playlist-badge.priv { color: #ffc800; }
         .profile-playlist-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-        .profile-pl-toggle {
-          padding: 6px 12px;
-          font-size: 0.85rem;
-          border: 1px solid rgba(5, 217, 232, 0.45);
-          background: transparent;
-          color: var(--neon-cyan);
-          border-radius: 8px;
+        .profile-playlist-admin-link {
+          font-size: 0.8rem;
+          color: var(--neon-pink);
+          text-decoration: underline;
         }
-        .profile-pl-toggle:hover:not(:disabled) { background: rgba(5, 217, 232, 0.1); }
-        .profile-pl-toggle:disabled { opacity: 0.6; }
         .profile-pl-delete {
           padding: 6px 12px;
           font-size: 0.85rem;

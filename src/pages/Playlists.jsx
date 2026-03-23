@@ -14,6 +14,9 @@ export default function Playlists() {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="page playlists-page">
       <h2 className="page-title">Плейлисты</h2>
+      <p className="playlists-lead">
+        Подборки редакции NovaSound. Собрать свой список можно в личном кабинете.
+      </p>
       {loading ? (
         <div className="loading">Загрузка...</div>
       ) : list.length === 0 ? (
@@ -39,7 +42,14 @@ export default function Playlists() {
           padding-left: 280px;
           padding-right: 24px;
         }
-        .page-title { color: var(--neon-cyan); margin-bottom: 24px; }
+        .page-title { color: var(--neon-cyan); margin-bottom: 12px; }
+        .playlists-lead {
+          color: var(--text-dim);
+          font-size: 0.95rem;
+          line-height: 1.45;
+          max-width: 560px;
+          margin: 0 0 24px;
+        }
         .playlist-grid {
           display: grid;
           grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
