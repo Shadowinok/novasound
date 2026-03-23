@@ -15,6 +15,7 @@ export function PlayerProvider({ children }) {
   const [currentTrack, setCurrentTrack] = useState(null);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [buffered, setBuffered] = useState(0);
   const [duration, setDuration] = useState(0);
   const [queue, setQueue] = useState([]);
   const [queueIndex, setQueueIndex] = useState(0);
@@ -47,6 +48,7 @@ export function PlayerProvider({ children }) {
       setCurrentTrack(null);
       setPlaying(false);
       setProgress(0);
+      setBuffered(0);
       setDuration(0);
       return;
     }
@@ -103,6 +105,7 @@ export function PlayerProvider({ children }) {
     seekHoldUntilRef.current = 0;
     seekTargetRef.current = 0;
     setProgress(0);
+    setBuffered(0);
     setDuration(track.duration || 0);
     setPlaying(true);
     howl.play();
@@ -180,6 +183,7 @@ export function PlayerProvider({ children }) {
       seekHoldUntilRef.current = 0;
       seekTargetRef.current = 0;
       setProgress(0);
+      setBuffered(0);
       setDuration(0);
       setQueue([]);
       setQueueIndex(0);
@@ -241,6 +245,7 @@ export function PlayerProvider({ children }) {
     seekHoldUntilRef.current = 0;
     seekTargetRef.current = 0;
     setProgress(0);
+    setBuffered(0);
     setDuration(0);
       setQueue([]);
       setQueueIndex(0);
@@ -257,6 +262,14 @@ export function PlayerProvider({ children }) {
       if (!h) return;
       const pos = h.seek();
       if (typeof pos !== 'number' || Number.isNaN(pos)) return;
+      const total = Math.max(Number(h.duration()) || 0, 0);
+      const node = h._sounds?.[0]?._node;
+      if (node && total > 0 && node.buffered && typeof node.buffered.length === 'number' && node.buffered.length > 0) {
+        const end = Number(node.buffered.end(node.buffered.length - 1));
+        if (Number.isFinite(end)) {
+          setBuffered(Math.max(0, Math.min(total, end)));
+        }
+      }
       const now = Date.now();
       if (now < seekHoldUntilRef.current && pos + 0.2 < seekTargetRef.current) {
         setProgress(seekTargetRef.current);
@@ -276,6 +289,7 @@ export function PlayerProvider({ children }) {
       currentTrack,
       playing,
       progress,
+      buffered,
       duration,
       queue,
       queueIndex,
