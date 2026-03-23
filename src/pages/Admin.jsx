@@ -30,12 +30,13 @@ export default function Admin() {
   const [plSaving, setPlSaving] = useState(false);
   const [plFormOk, setPlFormOk] = useState('');
   const [plFormErr, setPlFormErr] = useState('');
+  const [plScope, setPlScope] = useState('editorial');
 
   const fetchPending = () => {
     adminApi.pendingTracks().then((r) => setPending(r.data || [])).catch(() => setPending([]));
   };
   const fetchPlaylists = () => {
-    adminApi.playlists('editorial').then((r) => setPlaylists(r.data || [])).catch(() => setPlaylists([]));
+    adminApi.playlists(plScope).then((r) => setPlaylists(r.data || [])).catch(() => setPlaylists([]));
   };
   const fetchUsers = () => {
     adminApi.users().then((r) => setUsers(r.data || [])).catch(() => setUsers([]));
@@ -57,7 +58,7 @@ export default function Admin() {
         .catch(() => setPendingCovers([]))
         .finally(() => setLoading(false));
     } else if (tab === 'playlists') {
-      adminApi.playlists('editorial').then((r) => setPlaylists(r.data || [])).catch(() => setPlaylists([])).finally(() => setLoading(false));
+      adminApi.playlists(plScope).then((r) => setPlaylists(r.data || [])).catch(() => setPlaylists([])).finally(() => setLoading(false));
     } else if (tab === 'reports') {
       adminApi.trackReports('open')
         .then((r) => setTrackReports(r.data || []))
@@ -66,7 +67,7 @@ export default function Admin() {
     } else {
       adminApi.users().then((r) => setUsers(r.data || [])).catch(() => setUsers([])).finally(() => setLoading(false));
     }
-  }, [tab]);
+  }, [tab, plScope]);
 
   const handleApprove = (id) => {
     adminApi.approveTrack(id, comment).then(() => {
@@ -294,6 +295,19 @@ export default function Admin() {
           <p className="admin-hint">
             Только <strong>публичные</strong> подборки для главной и каталога. Обложка — jpg, png, webp (до 5 МБ). Треки добавляйте на сайте: откройте трек и нажмите «В плейлист», выберите этот плейлист (или создайте плейлист пустым и наполняйте позже).
           </p>
+          <div className="admin-pl-scope-row">
+            <label htmlFor="admin-pl-scope" className="admin-pl-scope-label">Показывать:</label>
+            <select
+              id="admin-pl-scope"
+              value={plScope}
+              onChange={(e) => setPlScope(e.target.value)}
+              className="admin-pl-scope-select"
+            >
+              <option value="editorial">Только админские публичные</option>
+              <option value="public">Все публичные</option>
+              <option value="all">Все (включая личные)</option>
+            </select>
+          </div>
           {plFormOk && <div className="admin-message">{plFormOk}</div>}
           {plFormErr && <div className="admin-pl-error">{plFormErr}</div>}
           <form className="admin-playlist-form" onSubmit={handlePlaylistSubmit}>
@@ -557,6 +571,21 @@ export default function Admin() {
           color: var(--neon-pink);
         }
         .admin-hint { color: var(--text-dim); margin-bottom: 12px; font-size: 0.9rem; }
+        .admin-pl-scope-row {
+          display: flex;
+          gap: 10px;
+          align-items: center;
+          margin-bottom: 14px;
+          flex-wrap: wrap;
+        }
+        .admin-pl-scope-label { color: var(--text-dim); font-size: 0.85rem; }
+        .admin-pl-scope-select {
+          padding: 8px 12px;
+          border: 1px solid rgba(5, 217, 232, 0.4);
+          border-radius: 8px;
+          background: rgba(0,0,0,0.3);
+          color: var(--text);
+        }
         .admin-comment-input {
           width: 100%;
           max-width: 400px;
