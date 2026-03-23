@@ -154,6 +154,44 @@ export const playlists = {
   createMy: (data) => client.post('/playlists/my', data),
   updateMy: (id, data) => client.put(`/playlists/my/${id}`, data),
   deleteMy: (id) => client.delete(`/playlists/my/${id}`),
+  /** Смена обложки своего плейлиста (multipart, поле cover) — POST как у треков для Vercel */
+  updateMyCover: async (id, formData) => {
+    const idStr = String(id ?? '').trim();
+    const token = typeof localStorage !== 'undefined' ? localStorage.getItem('novasound_token') : null;
+    const base = getApiBase().replace(/\/$/, '');
+    const path = `/playlists/my/${encodeURIComponent(idStr)}/cover`;
+    const url = `${base}${path}`;
+
+    const { status, data } = await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url, true);
+      if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      xhr.onload = () => {
+        let parsed = {};
+        try {
+          parsed = xhr.responseText ? JSON.parse(xhr.responseText) : {};
+        } catch (_) {
+          parsed = { message: xhr.status >= 400 ? `Ошибка сервера (${xhr.status})` : '' };
+        }
+        resolve({ status: xhr.status, data: parsed });
+      };
+      xhr.onerror = () =>
+        reject(new Error('Нет связи с сервером (сеть/CORS). На своём домене добавь CORS_EXTRA_ORIGINS на Render.'));
+      xhr.send(formData);
+    });
+
+    if (status === 401) {
+      localStorage.removeItem('novasound_token');
+      localStorage.removeItem('novasound_user');
+      window.dispatchEvent(new Event('auth_logout'));
+    }
+    if (status < 200 || status >= 300) {
+      const err = new Error(data.message || 'Не удалось загрузить обложку');
+      err.response = { status, data };
+      throw err;
+    }
+    return { data };
+  },
   addTrack: (playlistId, trackId) => client.post(`/playlists/${playlistId}/tracks/${trackId}`),
   removeTrack: (playlistId, trackId) => client.delete(`/playlists/${playlistId}/tracks/${trackId}`),
   create: (formData) => client.post('/playlists', formData, { headers: formData instanceof FormData ? {} : { 'Content-Type': 'application/json' } }),
