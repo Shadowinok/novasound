@@ -1,8 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import client from '../api/client';
-import { admin as adminApi } from '../api/client';
+import { admin as adminApi, playlists as playlistsApi } from '../api/client';
 import TrackCard from '../components/TrackCard';
+
+function parseMongoIds(text) {
+  if (!text || !String(text).trim()) return [];
+  return String(text)
+    .split(/[\s,;]+/)
+    .map((s) => s.trim())
+    .filter((s) => /^[a-f\d]{24}$/i.test(s));
+}
 
 export default function Admin() {
   const [pending, setPending] = useState([]);
@@ -20,6 +29,15 @@ export default function Admin() {
   const [loading, setLoading] = useState(true);
   const [pendingCovers, setPendingCovers] = useState([]);
   const [userSearch, setUserSearch] = useState('');
+  const [plTitle, setPlTitle] = useState('');
+  const [plDescription, setPlDescription] = useState('');
+  const [plTracksText, setPlTracksText] = useState('');
+  const [plCoverFile, setPlCoverFile] = useState(null);
+  const [plCoverInputKey, setPlCoverInputKey] = useState(0);
+  const [plEditingId, setPlEditingId] = useState(null);
+  const [plSaving, setPlSaving] = useState(false);
+  const [plFormOk, setPlFormOk] = useState('');
+  const [plFormErr, setPlFormErr] = useState('');
 
   const fetchPending = () => {
     adminApi.pendingTracks().then((r) => setPending(r.data || [])).catch(() => setPending([]));
@@ -99,6 +117,88 @@ export default function Admin() {
       })
       .catch((e) => setAdminMessage(e.response?.data?.message || 'Ошибка удаления пользователя'))
       .finally(() => setDeletingUserId(''));
+  };
+
+  const resetPlaylistForm = (clearMessages = true) => {
+    setPlTitle('');
+    setPlDescription('');
+    setPlTracksText('');
+    setPlCoverFile(null);
+    setPlCoverInputKey((k) => k + 1);
+    setPlEditingId(null);
+    if (clearMessages) {
+      setPlFormOk('');
+      setPlFormErr('');
+    }
+  };
+
+  const startEditPlaylist = (p) => {
+    setPlFormOk('');
+    setPlFormErr('');
+    setPlEditingId(p._id);
+    setPlTitle(p.title || '');
+    setPlDescription(p.description || '');
+    const ids = (p.tracks || []).map((t) => (typeof t === 'object' && t?._id ? t._id : t)).filter(Boolean);
+    setPlTracksText(ids.join(', '));
+    setPlCoverFile(null);
+    setPlCoverInputKey((k) => k + 1);
+  };
+
+  const handlePlaylistSubmit = (e) => {
+    e.preventDefault();
+    setPlFormOk('');
+    setPlFormErr('');
+    const title = plTitle.trim();
+    if (!title) {
+      setPlFormErr('Укажите название плейлиста');
+      return;
+    }
+    const ids = parseMongoIds(plTracksText);
+    const fd = new FormData();
+    fd.append('title', title);
+    fd.append('description', plDescription.trim());
+    fd.append('tracks', JSON.stringify(ids));
+    if (plCoverFile) fd.append('cover', plCoverFile);
+
+    setPlSaving(true);
+    const wasEdit = !!plEditingId;
+    const req = plEditingId
+      ? playlistsApi.update(plEditingId, fd)
+      : playlistsApi.create(fd);
+    req
+      .then(() => {
+        resetPlaylistForm(false);
+        setPlFormErr('');
+        setPlFormOk(wasEdit ? 'Плейлист сохранён' : 'Плейлист создан');
+        fetchPlaylists();
+      })
+      .catch((err) => {
+        const m =
+          err.response?.data?.message
+          || err.response?.data?.errors?.[0]?.msg
+          || err.message
+          || 'Ошибка сохранения';
+        setPlFormErr(m);
+      })
+      .finally(() => setPlSaving(false));
+  };
+
+  const handleDeletePlaylist = (id, title) => {
+    // eslint-disable-next-line no-alert
+    if (!window.confirm(`Удалить плейлист «${title}»? Это действие необратимо.`)) return;
+    setPlSaving(true);
+    setPlFormOk('');
+    setPlFormErr('');
+    playlistsApi
+      .delete(id)
+      .then(() => {
+        setPlFormOk('Плейлист удалён');
+        setPlFormErr('');
+        if (plEditingId === id) resetPlaylistForm(false);
+        fetchPlaylists();
+      })
+      .catch((err) => setPlFormErr(err.response?.data?.message || 'Не удалось удалить'))
+      .finally(() => setPlSaving(false));
   };
 
   const handleResolveReport = (reportId, action) => {
@@ -201,14 +301,111 @@ export default function Admin() {
       )}
       {tab === 'playlists' && (
         <div className="admin-playlists">
-          <p className="admin-hint">Управление плейлистами — создание и редактирование через API. Список:</p>
-          <ul className="playlist-list">
-            {playlists.map((p) => (
-              <li key={p._id}>
-                <a href={`/playlist/${p._id}`} className="playlist-link">{p.title}</a>
-              </li>
-            ))}
-          </ul>
+          <p className="admin-hint">
+            Публичные подборки для главной и каталога. Обложка — jpg, png, webp (до 5 МБ). ID треков — через запятую или с новой строки (одобренные треки).
+          </p>
+          {plFormOk && <div className="admin-message">{plFormOk}</div>}
+          {plFormErr && <div className="admin-pl-error">{plFormErr}</div>}
+          <form className="admin-playlist-form" onSubmit={handlePlaylistSubmit}>
+            <h3 className="admin-playlist-form-title">{plEditingId ? 'Редактировать плейлист' : 'Новый плейлист'}</h3>
+            <label className="admin-pl-label">
+              Название *
+              <input
+                type="text"
+                className="admin-comment-input admin-pl-field"
+                value={plTitle}
+                onChange={(e) => setPlTitle(e.target.value)}
+                placeholder="Название"
+                maxLength={100}
+                required
+              />
+            </label>
+            <label className="admin-pl-label">
+              Описание
+              <textarea
+                className="admin-comment-input admin-pl-textarea"
+                value={plDescription}
+                onChange={(e) => setPlDescription(e.target.value)}
+                placeholder="Краткое описание (опционально)"
+                rows={3}
+                maxLength={1000}
+              />
+            </label>
+            <label className="admin-pl-label">
+              Обложка {plEditingId ? '(новый файл заменит текущую)' : '(опционально)'}
+              <input
+                key={plCoverInputKey}
+                type="file"
+                accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                className="admin-pl-file"
+                onChange={(e) => setPlCoverFile(e.target.files?.[0] || null)}
+              />
+            </label>
+            <label className="admin-pl-label">
+              ID треков (MongoDB ObjectId)
+              <textarea
+                className="admin-comment-input admin-pl-textarea"
+                value={plTracksText}
+                onChange={(e) => setPlTracksText(e.target.value)}
+                placeholder="507f1f77bcf86cd799439011, 507f191e810c19729de860ea"
+                rows={4}
+              />
+            </label>
+            <div className="admin-pl-form-actions">
+              <button type="submit" className="admin-btn admin-pl-submit" disabled={plSaving}>
+                {plSaving ? 'Сохранение...' : plEditingId ? 'Сохранить' : 'Создать плейлист'}
+              </button>
+              {plEditingId && (
+                <button type="button" className="admin-btn admin-pl-cancel" onClick={() => resetPlaylistForm()}>
+                  Отмена
+                </button>
+              )}
+            </div>
+          </form>
+          {loading ? (
+            <div className="loading">Загрузка...</div>
+          ) : playlists.length === 0 ? (
+            <div className="empty">Плейлистов пока нет</div>
+          ) : (
+            <div className="admin-playlist-grid">
+              {playlists.map((p) => (
+                <div key={p._id} className="admin-playlist-card">
+                  <div
+                    className="admin-playlist-card-cover"
+                    style={{
+                      backgroundImage: p.coverImage
+                        ? `url(${p.coverImage})`
+                        : 'linear-gradient(135deg, var(--neon-purple), var(--neon-pink))'
+                    }}
+                  />
+                  <div className="admin-playlist-card-body">
+                    <div className="admin-playlist-card-title">{p.title}</div>
+                    <div className="admin-playlist-card-meta">
+                      Треков: {Array.isArray(p.tracks) ? p.tracks.length : 0}
+                      {p.isPublic === false && <span className="admin-pl-badge priv">Личный</span>}
+                      {p.isPublic !== false && <span className="admin-pl-badge pub">В каталоге</span>}
+                    </div>
+                    <div className="admin-playlist-card-actions">
+                      <Link to={`/playlist/${p._id}`} className="admin-pl-link" target="_blank" rel="noreferrer">
+                        Открыть
+                      </Link>
+                      <button type="button" className="admin-btn admin-pl-edit" onClick={() => startEditPlaylist(p)}>
+                        Редактировать
+                      </button>
+                      <button
+                        type="button"
+                        className="admin-btn reject"
+                        onClick={() => handleDeletePlaylist(p._id, p.title)}
+                        disabled={plSaving}
+                      >
+                        Удалить
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
       {tab === 'users' && (
@@ -418,8 +615,135 @@ export default function Admin() {
         }
         .admin-btn.approve { background: rgba(0, 255, 100, 0.3); color: #00ff64; }
         .admin-btn.reject { background: rgba(255, 50, 50, 0.3); color: #ff3232; }
-        .admin-playlists .playlist-list { list-style: none; }
-        .playlist-link { color: var(--neon-cyan); }
+        .admin-playlists { margin-top: 8px; }
+        .admin-playlist-form {
+          max-width: 520px;
+          padding: 18px;
+          margin-bottom: 28px;
+          border: 1px solid rgba(5, 217, 232, 0.25);
+          border-radius: 12px;
+          background: rgba(0,0,0,0.2);
+        }
+        .admin-playlist-form-title {
+          margin: 0 0 14px;
+          font-size: 1.05rem;
+          color: var(--neon-cyan);
+        }
+        .admin-pl-label {
+          display: block;
+          margin-bottom: 12px;
+          font-size: 0.85rem;
+          color: var(--text-dim);
+        }
+        .admin-pl-field { margin-bottom: 0 !important; max-width: none !important; width: 100%; }
+        .admin-pl-textarea {
+          width: 100%;
+          max-width: none;
+          min-height: 72px;
+          padding: 10px 14px;
+          margin-bottom: 0;
+          border: 1px solid rgba(5, 217, 232, 0.4);
+          border-radius: 8px;
+          background: rgba(0,0,0,0.3);
+          color: var(--text);
+          font-family: inherit;
+          resize: vertical;
+        }
+        .admin-pl-file {
+          margin-top: 6px;
+          font-size: 0.85rem;
+          color: var(--text);
+        }
+        .admin-pl-form-actions {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 10px;
+          margin-top: 8px;
+        }
+        .admin-pl-submit {
+          background: rgba(5, 217, 232, 0.25) !important;
+          color: var(--neon-cyan) !important;
+          flex: 0 1 auto;
+          padding: 10px 18px !important;
+        }
+        .admin-pl-cancel {
+          background: transparent !important;
+          border: 1px solid var(--text-dim) !important;
+          color: var(--text-dim) !important;
+        }
+        .admin-pl-error {
+          margin-bottom: 12px;
+          padding: 10px 12px;
+          border-radius: 8px;
+          background: rgba(255, 50, 50, 0.12);
+          border: 1px solid rgba(255, 80, 80, 0.35);
+          color: #ff6b6b;
+          font-size: 0.9rem;
+        }
+        .admin-playlist-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+          gap: 16px;
+        }
+        .admin-playlist-card {
+          display: flex;
+          gap: 12px;
+          padding: 12px;
+          border-radius: 12px;
+          border: 1px solid rgba(211, 0, 197, 0.25);
+          background: rgba(0,0,0,0.18);
+          align-items: flex-start;
+        }
+        .admin-playlist-card-cover {
+          width: 88px;
+          height: 88px;
+          flex-shrink: 0;
+          border-radius: 10px;
+          background-size: cover;
+          background-position: center;
+          border: 1px solid rgba(5, 217, 232, 0.2);
+        }
+        .admin-playlist-card-body { flex: 1; min-width: 0; }
+        .admin-playlist-card-title {
+          font-weight: 600;
+          color: var(--neon-cyan);
+          margin-bottom: 6px;
+          font-size: 0.95rem;
+          line-height: 1.3;
+        }
+        .admin-playlist-card-meta {
+          font-size: 0.8rem;
+          color: var(--text-dim);
+          margin-bottom: 12px;
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+          align-items: center;
+        }
+        .admin-pl-badge {
+          font-size: 0.75rem;
+          padding: 2px 8px;
+          border-radius: 999px;
+          border: 1px solid rgba(255, 200, 0, 0.35);
+        }
+        .admin-pl-badge.pub { color: #69db7c; border-color: rgba(0, 255, 100, 0.35); }
+        .admin-pl-badge.priv { color: #ffc800; }
+        .admin-playlist-card-actions {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          align-items: center;
+        }
+        .admin-pl-link {
+          font-size: 0.85rem;
+          color: var(--neon-pink);
+          text-decoration: underline;
+        }
+        .admin-pl-edit {
+          background: rgba(120, 120, 255, 0.2) !important;
+          color: #b9b9ff !important;
+          flex: 0 1 auto;
+        }
         .admin-message {
           margin-bottom: 12px;
           color: var(--neon-cyan);
