@@ -21,6 +21,8 @@ export default function PlayerBar() {
     closePlayer
   } = usePlayer();
   const [volumeOpen, setVolumeOpen] = useState(false);
+  const [isSeeking, setIsSeeking] = useState(false);
+  const [seekDraft, setSeekDraft] = useState(0);
   const volumeWrapRef = useRef(null);
 
   useEffect(() => {
@@ -63,6 +65,8 @@ export default function PlayerBar() {
   };
 
   if (!currentTrack) return null;
+  const maxDuration = duration > 0 ? duration : 1;
+  const sliderValue = isSeeking ? seekDraft : (duration > 0 ? Math.min(progress, duration) : 0);
 
   return (
     <AnimatePresence>
@@ -96,15 +100,43 @@ export default function PlayerBar() {
           <input
             type="range"
             min={0}
-            max={duration > 0 ? duration : 1}
+            max={maxDuration}
             step="any"
-            value={duration > 0 ? Math.min(progress, duration) : 0}
+            value={sliderValue}
             disabled={!duration || duration <= 0}
             onChange={(e) => {
               const v = Number(e.target.value);
-              if (duration > 0 && Number.isFinite(v)) seek(v);
+              if (!Number.isFinite(v)) return;
+              setSeekDraft(v);
+              if (!isSeeking && duration > 0) seek(v);
             }}
-            onMouseDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              setIsSeeking(true);
+              setSeekDraft(sliderValue);
+            }}
+            onTouchStart={(e) => {
+              e.stopPropagation();
+              setIsSeeking(true);
+              setSeekDraft(sliderValue);
+            }}
+            onMouseUp={() => {
+              if (duration > 0) seek(seekDraft);
+              setIsSeeking(false);
+            }}
+            onTouchEnd={() => {
+              if (duration > 0) seek(seekDraft);
+              setIsSeeking(false);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'Home' || e.key === 'End') {
+                setIsSeeking(true);
+              }
+            }}
+            onKeyUp={() => {
+              if (duration > 0) seek(seekDraft);
+              setIsSeeking(false);
+            }}
             className="player-slider"
             aria-label="Прогресс воспроизведения"
           />
