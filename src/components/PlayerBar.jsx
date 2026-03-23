@@ -40,22 +40,6 @@ export default function PlayerBar() {
   }, [seekDraft]);
 
   useEffect(() => {
-    if (!isSeeking) return undefined;
-    const finishSeek = () => {
-      commitSeek(seekDraftRef.current);
-      setIsSeeking(false);
-    };
-    window.addEventListener('mouseup', finishSeek);
-    window.addEventListener('touchend', finishSeek, { passive: true });
-    window.addEventListener('touchcancel', finishSeek, { passive: true });
-    return () => {
-      window.removeEventListener('mouseup', finishSeek);
-      window.removeEventListener('touchend', finishSeek);
-      window.removeEventListener('touchcancel', finishSeek);
-    };
-  }, [isSeeking]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
     if (!volumeOpen) return;
     const onDoc = (e) => {
       if (volumeWrapRef.current && !volumeWrapRef.current.contains(e.target)) {
@@ -139,24 +123,26 @@ export default function PlayerBar() {
               if (!Number.isFinite(v)) return;
               setSeekDraft(v);
               seekDraftRef.current = v;
-              if (!isSeeking && duration > 0) seek(v);
+              if (!isSeeking && duration > 0) commitSeek(v);
             }}
-            onMouseDown={(e) => {
+            onPointerDown={(e) => {
               e.stopPropagation();
               setIsSeeking(true);
               setSeekDraft(sliderValue);
+              seekDraftRef.current = sliderValue;
+              if (e.currentTarget.setPointerCapture) {
+                try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
+              }
             }}
-            onTouchStart={(e) => {
+            onPointerUp={(e) => {
               e.stopPropagation();
-              setIsSeeking(true);
-              setSeekDraft(sliderValue);
-            }}
-            onMouseUp={(e) => {
-              e.stopPropagation();
-              commitSeek(e.currentTarget.value);
+              commitSeek(seekDraftRef.current);
               setIsSeeking(false);
+              if (e.currentTarget.releasePointerCapture) {
+                try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (_) {}
+              }
             }}
-            onTouchEnd={(e) => {
+            onPointerCancel={(e) => {
               e.stopPropagation();
               commitSeek(seekDraftRef.current);
               setIsSeeking(false);
