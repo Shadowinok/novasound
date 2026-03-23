@@ -208,6 +208,20 @@ export default function Admin() {
       .finally(() => setPlSaving(false));
   };
 
+  const handleSyncMonthlyReleases = () => {
+    setPlSaving(true);
+    setPlFormErr('');
+    setPlFormOk('');
+    adminApi
+      .syncMonthlyReleases()
+      .then(() => {
+        setPlFormOk('«Релизы месяца» синхронизированы');
+        fetchPlaylists();
+      })
+      .catch((err) => setPlFormErr(err.response?.data?.message || 'Не удалось синхронизировать «Релизы месяца»'))
+      .finally(() => setPlSaving(false));
+  };
+
   const handleResolveReport = (reportId, action) => {
     if (!reportId) return;
     setResolvingReportId(reportId);
@@ -330,6 +344,14 @@ export default function Admin() {
               disabled={plSaving}
             >
               {plSaving ? 'Синхронизируем...' : 'Синхронизировать гибрид'}
+            </button>
+            <button
+              type="button"
+              className="admin-btn admin-pl-monthly-sync"
+              onClick={handleSyncMonthlyReleases}
+              disabled={plSaving}
+            >
+              {plSaving ? 'Синхронизируем...' : 'Только релизы месяца'}
             </button>
           </div>
           {plFormOk && <div className="admin-message">{plFormOk}</div>}
@@ -615,6 +637,13 @@ export default function Admin() {
           background: rgba(255, 200, 0, 0.14) !important;
           color: #ffd65a !important;
           border: 1px solid rgba(255, 200, 0, 0.45) !important;
+          padding: 8px 12px !important;
+        }
+        .admin-pl-monthly-sync {
+          flex: 0 1 auto;
+          background: rgba(5, 217, 232, 0.14) !important;
+          color: var(--neon-cyan) !important;
+          border: 1px solid rgba(5, 217, 232, 0.45) !important;
           padding: 8px 12px !important;
         }
         .admin-comment-input {
