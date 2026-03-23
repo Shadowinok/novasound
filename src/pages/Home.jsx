@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import client from '../api/client';
 import { charts, playlists } from '../api/client';
 import TrackCard from '../components/TrackCard';
+import { coverImageBackgroundStyle } from '../utils/coverImage';
 
 export default function Home() {
   const [latest, setLatest] = useState([]);
@@ -43,7 +44,7 @@ export default function Home() {
               <Link key={p._id} to={`/playlist/${p._id}`} className="playlist-card">
                 <div
                   className="playlist-cover"
-                  style={{ backgroundImage: p.coverImage ? `url(${p.coverImage})` : 'linear-gradient(135deg, var(--neon-purple), var(--neon-pink))' }}
+                  style={coverImageBackgroundStyle(p.coverImage, p.updatedAt)}
                 />
                 <span className="playlist-title">{p.title}</span>
               </Link>

@@ -5,17 +5,14 @@ import client, { tracks as tracksApi, users as usersApi, playlists as playlistsA
 import { useAuth } from '../context/AuthContext';
 import TrackCard from '../components/TrackCard';
 import UploadTrack from '../components/UploadTrack';
+import { coverImageBackgroundStyle } from '../utils/coverImage';
 
 /** Обложка карточки: `playlist.coverImage` → иначе обложка первого трека → градиент (как на главной). */
 function playlistCardCoverStyle(p) {
-  if (p.coverImage) {
-    return { backgroundImage: `url(${p.coverImage})` };
-  }
+  if (p.coverImage) return coverImageBackgroundStyle(p.coverImage, p.updatedAt);
   const tracks = Array.isArray(p.tracks) ? p.tracks : [];
   const t = tracks.find((x) => x && x.coverImage);
-  if (t?.coverImage) {
-    return { backgroundImage: `url(${t.coverImage})` };
-  }
+  if (t?.coverImage) return coverImageBackgroundStyle(t.coverImage, t.updatedAt);
   return { backgroundImage: 'linear-gradient(135deg, var(--neon-purple), var(--neon-pink))' };
 }
 

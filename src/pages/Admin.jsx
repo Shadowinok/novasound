@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import client from '../api/client';
 import { admin as adminApi, playlists as playlistsApi } from '../api/client';
 import TrackCard from '../components/TrackCard';
+import { coverImageBackgroundStyle } from '../utils/coverImage';
 
 export default function Admin() {
   const [pending, setPending] = useState([]);
@@ -351,11 +352,7 @@ export default function Admin() {
                 <div key={p._id} className="admin-playlist-card">
                   <div
                     className="admin-playlist-card-cover"
-                    style={{
-                      backgroundImage: p.coverImage
-                        ? `url(${p.coverImage})`
-                        : 'linear-gradient(135deg, var(--neon-purple), var(--neon-pink))'
-                    }}
+                    style={coverImageBackgroundStyle(p.coverImage, p.updatedAt)}
                   />
                   <div className="admin-playlist-card-body">
                     <div className="admin-playlist-card-title">{p.title}</div>

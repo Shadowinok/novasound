@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import client, { playlists as playlistsApi } from '../api/client';
 import TrackCard from '../components/TrackCard';
 import { useAuth } from '../context/AuthContext';
+import { coverImageBackgroundStyle } from '../utils/coverImage';
 
 function isPlaylistOwner(playlist, user) {
   if (!playlist || !user) return false;
@@ -95,11 +96,7 @@ export default function PlaylistPage() {
       <div className="playlist-header">
         <div
           className="playlist-header-cover"
-          style={{
-            backgroundImage: playlist.coverImage
-              ? `url(${playlist.coverImage})`
-              : 'linear-gradient(135deg, var(--neon-purple), var(--neon-pink))'
-          }}
+          style={coverImageBackgroundStyle(playlist.coverImage, playlist.updatedAt)}
         />
         <div>
           <h1 className="playlist-header-title">
@@ -119,9 +116,6 @@ export default function PlaylistPage() {
                 Удалить плейлист
               </button>
               )}
-              <Link to="/profile" className="playlist-owner-link">
-                Личный кабинет
-              </Link>
             </div>
           )}
           {ownerMsg && <p className="playlist-owner-msg">{ownerMsg}</p>}
@@ -186,11 +180,6 @@ export default function PlaylistPage() {
         .playlist-owner-btn.danger {
           border-color: rgba(255, 80, 80, 0.55);
           color: #ff6b6b;
-        }
-        .playlist-owner-link {
-          color: var(--text-dim);
-          font-size: 0.9rem;
-          text-decoration: underline;
         }
         .playlist-owner-msg { color: #69db7c; margin-top: 8px; font-size: 0.9rem; }
         .track-grid {

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { playlists as playlistsApi } from '../api/client';
+import { coverImageBackgroundStyle } from '../utils/coverImage';
 
 export default function Playlists() {
   const [list, setList] = useState([]);
@@ -27,7 +28,7 @@ export default function Playlists() {
             <Link key={p._id} to={`/playlist/${p._id}`} className="playlist-card">
               <div
                 className="playlist-cover"
-                style={{ backgroundImage: p.coverImage ? `url(${p.coverImage})` : 'linear-gradient(135deg, var(--neon-purple), var(--neon-pink))' }}
+                style={coverImageBackgroundStyle(p.coverImage, p.updatedAt)}
               />
               <span className="playlist-title">{p.title}</span>
               {p.description && <span className="playlist-desc">{p.description}</span>}
