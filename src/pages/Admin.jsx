@@ -25,7 +25,7 @@ export default function Admin() {
     adminApi.pendingTracks().then((r) => setPending(r.data || [])).catch(() => setPending([]));
   };
   const fetchPlaylists = () => {
-    client.get('/playlists').then((r) => setPlaylists(r.data || [])).catch(() => setPlaylists([]));
+    adminApi.playlists().then((r) => setPlaylists(r.data || [])).catch(() => setPlaylists([]));
   };
   const fetchUsers = () => {
     adminApi.users().then((r) => setUsers(r.data || [])).catch(() => setUsers([]));
@@ -47,7 +47,7 @@ export default function Admin() {
         .catch(() => setPendingCovers([]))
         .finally(() => setLoading(false));
     } else if (tab === 'playlists') {
-      client.get('/playlists').then((r) => setPlaylists(r.data || [])).catch(() => setPlaylists([])).finally(() => setLoading(false));
+      adminApi.playlists().then((r) => setPlaylists(r.data || [])).catch(() => setPlaylists([])).finally(() => setLoading(false));
     } else if (tab === 'reports') {
       adminApi.trackReports('open')
         .then((r) => setTrackReports(r.data || []))
