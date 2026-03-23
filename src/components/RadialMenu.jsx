@@ -16,6 +16,10 @@ const items = [
 const GAP_MIN_PX = 3;
 /** Отступ от краёв окна при проверке вписывания (адаптив веера) */
 const SCREEN_PAD = 5;
+const EPS = 1e-9;
+const RADIUS_EPS = 1e-3;
+const RADIUS_MULTIPLIERS = [1, 1.04, 1.08, 1.12, 1.16, 1.2, 1.26, 1.32, 1.4, 1.5];
+const ANGLE_OFFSETS = Array.from({ length: 29 }, (_, i) => ((i - 14) * 0.04) * Math.PI);
 
 /**
  * Отступ контейнера меню от угла layout-shell — слева и сверху одинаково.
@@ -63,6 +67,28 @@ function fanMinTopLeft(px, py, n, d, R, startAngle, deltaTheta) {
   return { minTop, minLeft };
 }
 
+function isBetterFit(a, b) {
+  if (!b) return true;
+  const aMaxErr = Math.max(a.topError, a.leftError);
+  const bMaxErr = Math.max(b.topError, b.leftError);
+  if (Math.abs(aMaxErr - bMaxErr) > EPS) return aMaxErr < bMaxErr;
+  if (Math.abs(a.topError - b.topError) > EPS) return a.topError < b.topError;
+  if (Math.abs(a.leftError - b.leftError) > EPS) return a.leftError < b.leftError;
+  if (Math.abs(a.gapExtra - b.gapExtra) > EPS) return a.gapExtra < b.gapExtra;
+  if (Math.abs(a.radius - b.radius) > RADIUS_EPS) return a.radius < b.radius;
+  if (Math.abs(a.angleOffsetAbs - b.angleOffsetAbs) > EPS) return a.angleOffsetAbs < b.angleOffsetAbs;
+  return a.arcSpan < b.arcSpan;
+}
+
+function isBetterAny(a, b) {
+  if (!b) return true;
+  if (Math.abs(a.overflow - b.overflow) > EPS) return a.overflow < b.overflow;
+  if (Math.abs(a.topError - b.topError) > EPS) return a.topError < b.topError;
+  if (Math.abs(a.leftError - b.leftError) > EPS) return a.leftError < b.leftError;
+  if (Math.abs(a.gapExtra - b.gapExtra) > EPS) return a.gapExtra < b.gapExtra;
+  return a.radius < b.radius;
+}
+
 /**
  * Подбираем дугу и минимальный R по зазору между соседями (хорда = d + gap),
  * затем пробуем несколько длин луча (R), чтобы меню полностью влезало в экран.
@@ -73,38 +99,8 @@ function computeFanLayout({ n, d, px, py, vw, vh, pad, startAngleBase }) {
   }
   const cMin = d + GAP_MIN_PX;
   const padEff = pad;
-  // Поворачиваем веер в более широком и более плавном диапазоне.
-  const angleOffsets = [];
-  for (let s = -14; s <= 14; s++) angleOffsets.push((s * 0.04) * Math.PI);
-  // Луч можно увеличивать, если это нужно чтобы держать экранные отступы.
-  const radiusMultipliers = [1, 1.04, 1.08, 1.12, 1.16, 1.2, 1.26, 1.32, 1.4, 1.5];
   let bestFit = null;
   let bestAny = null;
-
-  const isBetterFit = (a, b) => {
-    if (!b) return true;
-    // Сначала одновременно держим верх и лево (минимизируем худшую ошибку).
-    const aMaxErr = Math.max(a.topError, a.leftError);
-    const bMaxErr = Math.max(b.topError, b.leftError);
-    if (Math.abs(aMaxErr - bMaxErr) > 1e-9) return aMaxErr < bMaxErr;
-    // Затем улучшаем каждую ошибку отдельно.
-    if (Math.abs(a.topError - b.topError) > 1e-9) return a.topError < b.topError;
-    if (Math.abs(a.leftError - b.leftError) > 1e-9) return a.leftError < b.leftError;
-    // После якорей — компактность.
-    if (Math.abs(a.gapExtra - b.gapExtra) > 1e-9) return a.gapExtra < b.gapExtra;
-    if (Math.abs(a.radius - b.radius) > 1e-3) return a.radius < b.radius;
-    if (Math.abs(a.angleOffsetAbs - b.angleOffsetAbs) > 1e-9) return a.angleOffsetAbs < b.angleOffsetAbs;
-    return a.arcSpan < b.arcSpan;
-  };
-
-  const isBetterAny = (a, b) => {
-    if (!b) return true;
-    if (Math.abs(a.overflow - b.overflow) > 1e-9) return a.overflow < b.overflow;
-    if (Math.abs(a.topError - b.topError) > 1e-9) return a.topError < b.topError;
-    if (Math.abs(a.leftError - b.leftError) > 1e-9) return a.leftError < b.leftError;
-    if (Math.abs(a.gapExtra - b.gapExtra) > 1e-9) return a.gapExtra < b.gapExtra;
-    return a.radius < b.radius;
-  };
 
   for (let k = 0; k < 140; k++) {
     const arcSpan = (0.32 + k * 0.012) * Math.PI;
@@ -115,11 +111,11 @@ function computeFanLayout({ n, d, px, py, vw, vh, pad, startAngleBase }) {
     const minR = cMin / (2 * sh);
     if (!(minR > 0)) continue;
 
-    for (let a = 0; a < angleOffsets.length; a++) {
-      const angleOffset = angleOffsets[a];
+    for (let a = 0; a < ANGLE_OFFSETS.length; a++) {
+      const angleOffset = ANGLE_OFFSETS[a];
       const startAngle = startAngleBase + angleOffset;
-      for (let i = 0; i < radiusMultipliers.length; i++) {
-        const R = minR * radiusMultipliers[i];
+      for (let i = 0; i < RADIUS_MULTIPLIERS.length; i++) {
+        const R = minR * RADIUS_MULTIPLIERS[i];
         const fits = fanFitsViewport(px, py, n, d, R, startAngle, deltaTheta, vw, vh, padEff);
         const overflow = fanOverflow(px, py, n, d, R, startAngle, deltaTheta, vw, vh, padEff);
         const { minTop, minLeft } = fanMinTopLeft(px, py, n, d, R, startAngle, deltaTheta);
@@ -261,6 +257,41 @@ export default function RadialMenu({ user, isAdmin }) {
     [count, layout.vw, layout.vh, layout.mobilePx, layout.mobilePy]
   );
 
+  const renderFanItems = (itemsList, geom, itemSize, itemHalf, closeMenu, keyPrefix, itemClassName, spring) =>
+    itemsList.map((item, i) => {
+      const angle = geom.startAngle + geom.angleStep * i;
+      const x = Math.cos(angle) * geom.radius;
+      const y = Math.sin(angle) * geom.radius;
+      const isActive = location.pathname === item.path || (item.path === '/' && location.pathname === '/');
+      return (
+        <motion.div
+          key={`${keyPrefix}-${item.path}`}
+          initial={{ opacity: 0, scale: 0, x: 0, y: 0 }}
+          animate={{ opacity: 1, scale: 1, x, y }}
+          exit={{ opacity: 0, scale: 0, x: 0, y: 0 }}
+          transition={spring}
+          style={{
+            position: 'absolute',
+            left: '50%',
+            top: '50%',
+            width: itemSize,
+            height: itemSize,
+            marginLeft: -itemHalf,
+            marginTop: -itemHalf
+          }}
+        >
+          <Link
+            to={item.path}
+            className={`radial-item ${itemClassName} ${isActive ? 'active' : ''}`}
+            onClick={closeMenu}
+          >
+            <span className="radial-icon">{item.icon}</span>
+            <span className="radial-label">{item.label}</span>
+          </Link>
+        </motion.div>
+      );
+    });
+
   return (
     <>
       <nav
@@ -271,39 +302,16 @@ export default function RadialMenu({ user, isAdmin }) {
         <AnimatePresence>
           {openDesktop && (
             <>
-              {filtered.map((item, i) => {
-                const angle = desktopGeom.startAngle + desktopGeom.angleStep * i;
-                const x = Math.cos(angle) * desktopGeom.radius;
-                const y = Math.sin(angle) * desktopGeom.radius;
-                const isActive = location.pathname === item.path || (item.path === '/' && location.pathname === '/');
-                return (
-                  <motion.div
-                    key={`d-${item.path}`}
-                    initial={{ opacity: 0, scale: 0, x: 0, y: 0 }}
-                    animate={{ opacity: 1, scale: 1, x, y }}
-                    exit={{ opacity: 0, scale: 0, x: 0, y: 0 }}
-                    transition={{ type: 'spring', stiffness: 260, damping: 22 }}
-                    style={{
-                      position: 'absolute',
-                      left: '50%',
-                      top: '50%',
-                      width: deskItemSize,
-                      height: deskItemSize,
-                      marginLeft: -deskHalf,
-                      marginTop: -deskHalf
-                    }}
-                  >
-                    <Link
-                      to={item.path}
-                      className={`radial-item radial-item--desktop ${isActive ? 'active' : ''}`}
-                      onClick={() => setOpenDesktop(false)}
-                    >
-                      <span className="radial-icon">{item.icon}</span>
-                      <span className="radial-label">{item.label}</span>
-                    </Link>
-                  </motion.div>
-                );
-              })}
+              {renderFanItems(
+                filtered,
+                desktopGeom,
+                deskItemSize,
+                deskHalf,
+                () => setOpenDesktop(false),
+                'd',
+                'radial-item--desktop',
+                { type: 'spring', stiffness: 260, damping: 22 }
+              )}
             </>
           )}
         </AnimatePresence>
@@ -328,39 +336,16 @@ export default function RadialMenu({ user, isAdmin }) {
         <AnimatePresence>
           {openMobile && (
             <>
-              {filtered.map((item, i) => {
-                const angle = mobileGeom.startAngle + mobileGeom.angleStep * i;
-                const x = Math.cos(angle) * mobileGeom.radius;
-                const y = Math.sin(angle) * mobileGeom.radius;
-                const isActive = location.pathname === item.path || (item.path === '/' && location.pathname === '/');
-                return (
-                  <motion.div
-                    key={`m-${item.path}`}
-                    initial={{ opacity: 0, scale: 0, x: 0, y: 0 }}
-                    animate={{ opacity: 1, scale: 1, x, y }}
-                    exit={{ opacity: 0, scale: 0, x: 0, y: 0 }}
-                    transition={{ type: 'spring', stiffness: 280, damping: 22 }}
-                    style={{
-                      position: 'absolute',
-                      left: '50%',
-                      top: '50%',
-                      width: mobItemSize,
-                      height: mobItemSize,
-                      marginLeft: -mobHalf,
-                      marginTop: -mobHalf
-                    }}
-                  >
-                    <Link
-                      to={item.path}
-                      className={`radial-item radial-item--mobile ${isActive ? 'active' : ''}`}
-                      onClick={() => setOpenMobile(false)}
-                    >
-                      <span className="radial-icon">{item.icon}</span>
-                      <span className="radial-label">{item.label}</span>
-                    </Link>
-                  </motion.div>
-                );
-              })}
+              {renderFanItems(
+                filtered,
+                mobileGeom,
+                mobItemSize,
+                mobHalf,
+                () => setOpenMobile(false),
+                'm',
+                'radial-item--mobile',
+                { type: 'spring', stiffness: 280, damping: 22 }
+              )}
             </>
           )}
         </AnimatePresence>
