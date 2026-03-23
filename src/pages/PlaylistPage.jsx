@@ -122,8 +122,8 @@ export default function PlaylistPage() {
         </div>
       </div>
       <div className="track-grid">
-        {tracks.map((t) => (
-          <TrackCard key={t._id} track={t} />
+        {tracks.map((t, i) => (
+          <TrackCard key={t._id} track={t} playQueue={tracks} playQueueIndex={i} />
         ))}
       </div>
       <style>{`
