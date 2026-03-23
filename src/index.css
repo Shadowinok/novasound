@@ -16,6 +16,12 @@
   --font-body: 'Rajdhani', sans-serif;
 }
 
+html {
+  /* Моб. браузеры иногда самовольно увеличивают шрифты и "раздувают" верстку. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -70,5 +76,61 @@ h1, h2, h3 {
 @media (max-width: 480px) {
   body {
     font-size: 0.95rem;
+  }
+}
+
+@media (max-width: 768px) {
+  body {
+    font-size: 0.92rem;
+    line-height: 1.38;
+  }
+
+  .page-title {
+    font-size: 1.25rem !important;
+    margin-bottom: 14px !important;
+  }
+
+  .section-title {
+    font-size: 1.05rem !important;
+    margin-bottom: 12px !important;
+  }
+
+  .track-grid {
+    grid-template-columns: repeat(auto-fill, minmax(142px, 1fr)) !important;
+    gap: 12px !important;
+  }
+
+  .playlist-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)) !important;
+    gap: 12px !important;
+  }
+
+  .track-card {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+}
+
+@media (max-width: 480px) {
+  body {
+    font-size: 0.88rem;
+  }
+
+  .page-title {
+    font-size: 1.15rem !important;
+  }
+
+  .section-title {
+    font-size: 1rem !important;
+  }
+
+  .track-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+  }
+
+  .playlist-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
   }
 }
