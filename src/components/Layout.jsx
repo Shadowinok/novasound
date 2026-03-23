@@ -28,6 +28,7 @@ export default function Layout() {
     <div className="layout">
       <ParticleBackground />
       <div className="layout-shell">
+        <RadialMenu user={user} isAdmin={isAdmin} />
         <header className="header">
           <div className="header-inner">
             <div className="header-spacer" aria-hidden="true" />
@@ -53,7 +54,6 @@ export default function Layout() {
           <Outlet />
         </main>
       </div>
-      <RadialMenu user={user} isAdmin={isAdmin} />
       <PlayerBar />
       <footer className="site-footer site-footer--dock" aria-label="Служебные ссылки">
         {pathname !== '/about' && <Link to="/about">О проекте</Link>}
