@@ -8,18 +8,29 @@ export default function Catalog() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [sort, setSort] = useState('-createdAt');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const t = setTimeout(() => {
+      const q = searchInput.trim();
+      setSearch(q);
+      setPage(1);
+    }, 250);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+
+  useEffect(() => {
     setLoading(true);
-    client.get('/tracks', { params: { page, limit: 20, search: search || undefined, sort: '-createdAt' } })
+    client.get('/tracks', { params: { page, limit: 20, search: search || undefined, sort } })
       .then((r) => {
         setTracks(r.data.tracks || []);
         setTotal(r.data.total || 0);
       })
       .catch(() => setTracks([]))
       .finally(() => setLoading(false));
-  }, [page, search]);
+  }, [page, search, sort]);
 
   const pages = Math.ceil(total / 20) || 1;
 
@@ -29,11 +40,38 @@ export default function Catalog() {
       <div className="catalog-toolbar">
         <input
           type="search"
-          placeholder="Поиск по названию..."
-          value={search}
-          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+          placeholder="Поиск по названию и описанию..."
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
           className="search-input"
         />
+        <select
+          className="sort-select"
+          value={sort}
+          onChange={(e) => {
+            setSort(e.target.value);
+            setPage(1);
+          }}
+        >
+          <option value="-createdAt">Сначала новые</option>
+          <option value="createdAt">Сначала старые</option>
+          <option value="-plays">По прослушиваниям (↓)</option>
+          <option value="plays">По прослушиваниям (↑)</option>
+          <option value="title">По названию (А-Я)</option>
+          <option value="-title">По названию (Я-А)</option>
+        </select>
+        <button
+          type="button"
+          className="reset-btn"
+          onClick={() => {
+            setSearchInput('');
+            setSearch('');
+            setSort('-createdAt');
+            setPage(1);
+          }}
+        >
+          Сброс
+        </button>
       </div>
       {loading ? (
         <div className="loading">Загрузка...</div>
@@ -63,10 +101,15 @@ export default function Catalog() {
           padding-left: 280px;
           padding-right: 24px;
         }
-        .catalog-toolbar { margin-bottom: 24px; }
+        .catalog-toolbar {
+          margin-bottom: 24px;
+          display: flex;
+          flex-wrap: wrap;
+          gap: 10px;
+          align-items: center;
+        }
         .search-input {
-          width: 100%;
-          max-width: 400px;
+          width: min(100%, 460px);
           padding: 12px 16px;
           border: 1px solid rgba(5, 217, 232, 0.4);
           border-radius: 8px;
@@ -74,6 +117,24 @@ export default function Catalog() {
           color: var(--text);
           font-size: 1rem;
         }
+        .sort-select {
+          min-width: 210px;
+          padding: 12px 14px;
+          border: 1px solid rgba(5, 217, 232, 0.4);
+          border-radius: 8px;
+          background: rgba(0,0,0,0.3);
+          color: var(--text);
+          font-size: 0.95rem;
+        }
+        .reset-btn {
+          padding: 12px 14px;
+          border: 1px solid rgba(255, 42, 109, 0.5);
+          border-radius: 8px;
+          background: transparent;
+          color: var(--neon-pink);
+          font-size: 0.9rem;
+        }
+        .reset-btn:hover { background: rgba(255, 42, 109, 0.12); }
         .search-input:focus {
           outline: none;
           box-shadow: 0 0 15px rgba(5, 217, 232, 0.3);
