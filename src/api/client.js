@@ -203,7 +203,7 @@ export const playlists = {
 };
 
 export const admin = {
-  playlists: () => client.get('/admin/playlists'),
+  playlists: (scope = 'editorial') => client.get('/admin/playlists', { params: { scope } }),
   users: () => client.get('/admin/users'),
   deleteUser: (id, reason) => client.delete(`/admin/users/${id}`, { data: { reason } }),
   pendingTracks: () => client.get('/admin/tracks/pending'),
