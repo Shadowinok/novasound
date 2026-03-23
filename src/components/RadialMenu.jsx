@@ -13,7 +13,7 @@ const items = [
 ];
 
 export default function RadialMenu({ user, isAdmin }) {
-  const [open, setOpen] = useState(false);
+  const [openDesktop, setOpenDesktop] = useState(false);
   const location = useLocation();
   const filtered = items.filter(i => {
     if (i.admin && !isAdmin) return false;
@@ -26,55 +26,58 @@ export default function RadialMenu({ user, isAdmin }) {
   const startAngle = -Math.PI * 0.1;
 
   return (
-    <nav className="radial-menu">
-      <AnimatePresence>
-        {open && (
-          <>
-            {filtered.map((item, i) => {
-              const angle = startAngle + angleStep * i;
-              const x = Math.cos(angle) * radius;
-              const y = Math.sin(angle) * radius;
-              const isActive = location.pathname === item.path || (item.path === '/' && location.pathname === '/');
-              return (
-                <motion.div
-                  key={ item.path }
-                  initial={{ opacity: 0, scale: 0, x: 0, y: 0 }}
-                  animate={{ opacity: 1, scale: 1, x, y }}
-                  exit={{ opacity: 0, scale: 0, x: 0, y: 0 }}
-                  transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-                  style={{ position: 'absolute', left: '50%', top: '50%', marginLeft: x, marginTop: y }}
-                >
-                  <Link
-                    to={item.path}
-                    className={`radial-item ${isActive ? 'active' : ''}`}
-                    onClick={() => setOpen(false)}
+    <>
+      <nav className="radial-menu desktop-menu" aria-label="Навигация (desktop)">
+        <AnimatePresence>
+          {openDesktop && (
+            <>
+              {filtered.map((item, i) => {
+                const angle = startAngle + angleStep * i;
+                const x = Math.cos(angle) * radius;
+                const y = Math.sin(angle) * radius;
+                const isActive = location.pathname === item.path || (item.path === '/' && location.pathname === '/');
+                return (
+                  <motion.div
+                    key={ item.path }
+                    initial={{ opacity: 0, scale: 0, x: 0, y: 0 }}
+                    animate={{ opacity: 1, scale: 1, x, y }}
+                    exit={{ opacity: 0, scale: 0, x: 0, y: 0 }}
+                    transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+                    style={{ position: 'absolute', left: '50%', top: '50%', marginLeft: x, marginTop: y }}
                   >
-                    <span className="radial-icon">{item.icon}</span>
-                    <span className="radial-label">{item.label}</span>
-                  </Link>
-                </motion.div>
-              );
-            })}
-          </>
-        )}
-      </AnimatePresence>
-      <motion.button
-        type="button"
-        className="radial-toggle"
-        onClick={() => setOpen(!open)}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        animate={{ rotate: open ? 90 : 0 }}
-      >
-        <span className="logo-text">Nova</span>
-        <span className="logo-text accent">Sound</span>
-      </motion.button>
+                    <Link
+                      to={item.path}
+                      className={`radial-item ${isActive ? 'active' : ''}`}
+                      onClick={() => setOpenDesktop(false)}
+                    >
+                      <span className="radial-icon">{item.icon}</span>
+                      <span className="radial-label">{item.label}</span>
+                    </Link>
+                  </motion.div>
+                );
+              })}
+            </>
+          )}
+        </AnimatePresence>
+        <motion.button
+          type="button"
+          className="radial-toggle"
+          onClick={() => setOpenDesktop(!openDesktop)}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          animate={{ rotate: openDesktop ? 90 : 0 }}
+        >
+          <span className="logo-text">Nova</span>
+          <span className="logo-text accent">Sound</span>
+        </motion.button>
+      </nav>
+
       <style>{`
         .radial-menu {
           position: fixed;
-          bottom: calc(24px + var(--footer-dock-height, 30px));
-          left: 50%;
-          transform: translateX(-50%);
+          top: 0;
+          left: 0;
+          transform: none;
           width: 180px;
           height: 120px;
           z-index: 100;
@@ -129,6 +132,6 @@ export default function RadialMenu({ user, isAdmin }) {
           .radial-toggle { width: 80px; height: 80px; font-size: 0.75rem; }
         }
       `}</style>
-    </nav>
+    </>
   );
 }
