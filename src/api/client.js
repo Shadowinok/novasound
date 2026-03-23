@@ -149,6 +149,7 @@ export const charts = {
 
 export const playlists = {
   list: () => client.get('/playlists'),
+  featured: (limit = 6) => client.get('/playlists/featured', { params: { limit } }),
   myList: () => client.get('/playlists/my/list'),
   get: (id) => client.get(`/playlists/${id}`),
   createMy: (data) => client.post('/playlists/my', data),
