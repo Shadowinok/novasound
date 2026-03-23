@@ -26,7 +26,6 @@ export default function PlayerBar() {
   const [seekDraft, setSeekDraft] = useState(0);
   const volumeWrapRef = useRef(null);
   const seekDraftRef = useRef(0);
-  const seekingRef = useRef(false);
 
   const commitSeek = (value) => {
     if (!(duration > 0)) return;
@@ -40,22 +39,6 @@ export default function PlayerBar() {
   useEffect(() => {
     seekDraftRef.current = seekDraft;
   }, [seekDraft]);
-
-  useEffect(() => {
-    if (!isSeeking) return undefined;
-    const finishSeek = () => {
-      if (!seekingRef.current) return;
-      seekingRef.current = false;
-      commitSeek(seekDraftRef.current);
-      setIsSeeking(false);
-    };
-    window.addEventListener('pointerup', finishSeek, { passive: true });
-    window.addEventListener('pointercancel', finishSeek, { passive: true });
-    return () => {
-      window.removeEventListener('pointerup', finishSeek);
-      window.removeEventListener('pointercancel', finishSeek);
-    };
-  }, [isSeeking]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!volumeOpen) return;
@@ -163,17 +146,17 @@ export default function PlayerBar() {
             }}
             onPointerDown={(e) => {
               e.stopPropagation();
-              seekingRef.current = true;
               setIsSeeking(true);
-              setSeekDraft(sliderValue);
-              seekDraftRef.current = sliderValue;
+              const v = Number(e.currentTarget.value);
+              const next = Number.isFinite(v) ? v : sliderValue;
+              setSeekDraft(next);
+              seekDraftRef.current = next;
               if (e.currentTarget.setPointerCapture) {
                 try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
               }
             }}
             onPointerUp={(e) => {
               e.stopPropagation();
-              seekingRef.current = false;
               commitSeek(e.currentTarget.value);
               setIsSeeking(false);
               if (e.currentTarget.releasePointerCapture) {
@@ -182,13 +165,11 @@ export default function PlayerBar() {
             }}
             onPointerCancel={(e) => {
               e.stopPropagation();
-              seekingRef.current = false;
               commitSeek(seekDraftRef.current);
               setIsSeeking(false);
             }}
             onBlur={() => {
               if (!isSeeking) return;
-              seekingRef.current = false;
               commitSeek(seekDraftRef.current);
               setIsSeeking(false);
             }}
@@ -440,6 +421,7 @@ export default function PlayerBar() {
             -webkit-appearance: none;
             background: rgba(255,255,255,0.1);
             border-radius: 3px;
+            touch-action: none;
           }
           .player-slider::-webkit-slider-thumb {
             -webkit-appearance: none;
