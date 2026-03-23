@@ -192,6 +192,22 @@ export default function Admin() {
       .finally(() => setPlSaving(false));
   };
 
+  const handleSyncHybridPlaylists = () => {
+    setPlSaving(true);
+    setPlFormErr('');
+    setPlFormOk('');
+    adminApi
+      .syncHybridPlaylists()
+      .then((r) => {
+        const autoCount = Array.isArray(r.data?.auto) ? r.data.auto.length : 0;
+        const manualCount = Array.isArray(r.data?.manual) ? r.data.manual.length : 0;
+        setPlFormOk(`Гибрид синхронизирован: авто ${autoCount}, ручные ${manualCount}`);
+        fetchPlaylists();
+      })
+      .catch((err) => setPlFormErr(err.response?.data?.message || 'Не удалось синхронизировать гибрид'))
+      .finally(() => setPlSaving(false));
+  };
+
   const handleResolveReport = (reportId, action) => {
     if (!reportId) return;
     setResolvingReportId(reportId);
@@ -307,6 +323,14 @@ export default function Admin() {
               <option value="public">Все публичные</option>
               <option value="all">Все (включая личные)</option>
             </select>
+            <button
+              type="button"
+              className="admin-btn admin-pl-hybrid-sync"
+              onClick={handleSyncHybridPlaylists}
+              disabled={plSaving}
+            >
+              {plSaving ? 'Синхронизируем...' : 'Синхронизировать гибрид'}
+            </button>
           </div>
           {plFormOk && <div className="admin-message">{plFormOk}</div>}
           {plFormErr && <div className="admin-pl-error">{plFormErr}</div>}
@@ -585,6 +609,13 @@ export default function Admin() {
           border-radius: 8px;
           background: rgba(0,0,0,0.3);
           color: var(--text);
+        }
+        .admin-pl-hybrid-sync {
+          flex: 0 1 auto;
+          background: rgba(255, 200, 0, 0.14) !important;
+          color: #ffd65a !important;
+          border: 1px solid rgba(255, 200, 0, 0.45) !important;
+          padding: 8px 12px !important;
         }
         .admin-comment-input {
           width: 100%;
