@@ -7,6 +7,7 @@ export default function PlayerBar() {
     currentTrack,
     playing,
     progress,
+    buffered,
     duration,
     volume,
     queue,
@@ -98,6 +99,17 @@ export default function PlayerBar() {
   if (!currentTrack) return null;
   const maxDuration = duration > 0 ? duration : 1;
   const sliderValue = isSeeking ? seekDraft : (duration > 0 ? Math.min(progress, duration) : 0);
+  const playedPct = duration > 0 ? Math.max(0, Math.min(100, (sliderValue / duration) * 100)) : 0;
+  const bufferedPct = duration > 0 ? Math.max(0, Math.min(100, (buffered / duration) * 100)) : 0;
+  const sliderTrackStyle = {
+    background: `linear-gradient(to right,
+      rgba(5, 217, 232, 0.95) 0%,
+      rgba(5, 217, 232, 0.95) ${playedPct}%,
+      rgba(180, 220, 230, 0.45) ${playedPct}%,
+      rgba(180, 220, 230, 0.45) ${bufferedPct}%,
+      rgba(255,255,255,0.12) ${bufferedPct}%,
+      rgba(255,255,255,0.12) 100%)`
+  };
 
   return (
     <AnimatePresence>
@@ -134,6 +146,7 @@ export default function PlayerBar() {
             max={maxDuration}
             step="any"
             value={sliderValue}
+            style={sliderTrackStyle}
             disabled={!duration || duration <= 0}
             onInput={(e) => {
               const v = Number(e.target.value);
