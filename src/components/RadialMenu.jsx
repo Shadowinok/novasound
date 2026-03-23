@@ -207,10 +207,8 @@ export default function RadialMenu({ user, isAdmin }) {
   useLayoutEffect(() => {
     measurePivots();
     window.addEventListener('resize', measurePivots);
-    window.addEventListener('scroll', measurePivots, true);
     return () => {
       window.removeEventListener('resize', measurePivots);
-      window.removeEventListener('scroll', measurePivots, true);
     };
   }, [isNarrow]);
 
