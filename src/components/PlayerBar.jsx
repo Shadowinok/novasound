@@ -136,7 +136,6 @@ export default function PlayerBar() {
               if (!Number.isFinite(v)) return;
               setSeekDraft(v);
               seekDraftRef.current = v;
-              if (!isSeeking && duration > 0) commitSeek(v);
             }}
             onChange={(e) => {
               const v = Number(e.target.value);
@@ -421,7 +420,6 @@ export default function PlayerBar() {
             -webkit-appearance: none;
             background: rgba(255,255,255,0.1);
             border-radius: 3px;
-            touch-action: none;
           }
           .player-slider::-webkit-slider-thumb {
             -webkit-appearance: none;
