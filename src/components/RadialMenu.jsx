@@ -26,6 +26,8 @@ export default function RadialMenu({ user, isAdmin }) {
   const startAngle = Math.PI * 0.08;
   const itemSize = 50;
   const half = itemSize / 2;
+  const toggleSize = 82;
+  const toggleCenter = toggleSize / 2;
 
   return (
     <nav className="radial-menu" aria-label="Основная навигация">
@@ -47,12 +49,13 @@ export default function RadialMenu({ user, isAdmin }) {
                   transition={{ type: 'spring', stiffness: 320, damping: 24 }}
                   style={{
                     position: 'absolute',
-                    left: 0,
-                    top: 0,
+                    left: toggleCenter,
+                    top: toggleCenter,
                     width: itemSize,
                     height: itemSize,
                     marginLeft: -half,
-                    marginTop: -half
+                    marginTop: -half,
+                    zIndex: 2
                   }}
                 >
                   <Link
@@ -109,6 +112,8 @@ export default function RadialMenu({ user, isAdmin }) {
           align-items: center;
           justify-content: center;
           box-shadow: var(--glow-cyan);
+          position: relative;
+          z-index: 1;
         }
         .radial-toggle .accent { color: var(--neon-pink); }
         .radial-item {
