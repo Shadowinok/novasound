@@ -5,14 +5,6 @@ import client from '../api/client';
 import { admin as adminApi, playlists as playlistsApi } from '../api/client';
 import TrackCard from '../components/TrackCard';
 
-function parseMongoIds(text) {
-  if (!text || !String(text).trim()) return [];
-  return String(text)
-    .split(/[\s,;]+/)
-    .map((s) => s.trim())
-    .filter((s) => /^[a-f\d]{24}$/i.test(s));
-}
-
 export default function Admin() {
   const [pending, setPending] = useState([]);
   const [playlists, setPlaylists] = useState([]);
@@ -31,7 +23,6 @@ export default function Admin() {
   const [userSearch, setUserSearch] = useState('');
   const [plTitle, setPlTitle] = useState('');
   const [plDescription, setPlDescription] = useState('');
-  const [plTracksText, setPlTracksText] = useState('');
   const [plCoverFile, setPlCoverFile] = useState(null);
   const [plCoverInputKey, setPlCoverInputKey] = useState(0);
   const [plEditingId, setPlEditingId] = useState(null);
@@ -122,7 +113,6 @@ export default function Admin() {
   const resetPlaylistForm = (clearMessages = true) => {
     setPlTitle('');
     setPlDescription('');
-    setPlTracksText('');
     setPlCoverFile(null);
     setPlCoverInputKey((k) => k + 1);
     setPlEditingId(null);
@@ -138,8 +128,6 @@ export default function Admin() {
     setPlEditingId(p._id);
     setPlTitle(p.title || '');
     setPlDescription(p.description || '');
-    const ids = (p.tracks || []).map((t) => (typeof t === 'object' && t?._id ? t._id : t)).filter(Boolean);
-    setPlTracksText(ids.join(', '));
     setPlCoverFile(null);
     setPlCoverInputKey((k) => k + 1);
   };
@@ -153,11 +141,12 @@ export default function Admin() {
       setPlFormErr('Укажите название плейлиста');
       return;
     }
-    const ids = parseMongoIds(plTracksText);
     const fd = new FormData();
     fd.append('title', title);
     fd.append('description', plDescription.trim());
-    fd.append('tracks', JSON.stringify(ids));
+    if (!plEditingId) {
+      fd.append('tracks', JSON.stringify([]));
+    }
     if (plCoverFile) fd.append('cover', plCoverFile);
 
     setPlSaving(true);
@@ -302,7 +291,7 @@ export default function Admin() {
       {tab === 'playlists' && (
         <div className="admin-playlists">
           <p className="admin-hint">
-            Публичные подборки для главной и каталога. Обложка — jpg, png, webp (до 5 МБ). ID треков — через запятую или с новой строки (одобренные треки).
+            Только <strong>публичные</strong> подборки для главной и каталога. Обложка — jpg, png, webp (до 5 МБ). Треки добавляйте на сайте: откройте трек и нажмите «В плейлист», выберите этот плейлист (или создайте плейлист пустым и наполняйте позже).
           </p>
           {plFormOk && <div className="admin-message">{plFormOk}</div>}
           {plFormErr && <div className="admin-pl-error">{plFormErr}</div>}
@@ -341,16 +330,6 @@ export default function Admin() {
                 onChange={(e) => setPlCoverFile(e.target.files?.[0] || null)}
               />
             </label>
-            <label className="admin-pl-label">
-              ID треков (MongoDB ObjectId)
-              <textarea
-                className="admin-comment-input admin-pl-textarea"
-                value={plTracksText}
-                onChange={(e) => setPlTracksText(e.target.value)}
-                placeholder="507f1f77bcf86cd799439011, 507f191e810c19729de860ea"
-                rows={4}
-              />
-            </label>
             <div className="admin-pl-form-actions">
               <button type="submit" className="admin-btn admin-pl-submit" disabled={plSaving}>
                 {plSaving ? 'Сохранение...' : plEditingId ? 'Сохранить' : 'Создать плейлист'}
@@ -382,8 +361,7 @@ export default function Admin() {
                     <div className="admin-playlist-card-title">{p.title}</div>
                     <div className="admin-playlist-card-meta">
                       Треков: {Array.isArray(p.tracks) ? p.tracks.length : 0}
-                      {p.isPublic === false && <span className="admin-pl-badge priv">Личный</span>}
-                      {p.isPublic !== false && <span className="admin-pl-badge pub">В каталоге</span>}
+                      <span className="admin-pl-badge pub">В каталоге</span>
                     </div>
                     <div className="admin-playlist-card-actions">
                       <Link to={`/playlist/${p._id}`} className="admin-pl-link" target="_blank" rel="noreferrer">
