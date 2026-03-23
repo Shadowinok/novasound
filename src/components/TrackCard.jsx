@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { createPortal } from 'react-dom';
 import { usePlayer } from '../context/PlayerContext';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import client, { playlists as playlistsApi } from '../api/client';
 
 export default function TrackCard({
@@ -17,6 +18,7 @@ export default function TrackCard({
 }) {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { showToast } = useToast();
   const { loadTrack, currentTrack, playing } = usePlayer();
   const isCurrent = currentTrack?._id === track._id;
   const [likesCount, setLikesCount] = useState(typeof track.likes === 'number' ? track.likes : (track.likes?.length ?? 0));
@@ -29,13 +31,6 @@ export default function TrackCard({
   const [showPlaylist, setShowPlaylist] = useState(false);
   const [myPlaylists, setMyPlaylists] = useState([]);
   const [newPlaylistTitle, setNewPlaylistTitle] = useState('');
-  const [actionMessage, setActionMessage] = useState('');
-
-  useEffect(() => {
-    if (!actionMessage) return undefined;
-    const id = setTimeout(() => setActionMessage(''), 2200);
-    return () => clearTimeout(id);
-  }, [actionMessage]);
 
   const coverRaw = coverDisplayUrl || track.coverImage;
   const coverBust = track.updatedAt ? new Date(track.updatedAt).getTime() : (coverRaw ? String(coverRaw).slice(-24) : '');
@@ -94,7 +89,6 @@ export default function TrackCard({
 
   const openPlaylistModal = () => {
     if (!ensureAuth()) return;
-    setActionMessage('');
     setShowPlaylist(true);
     playlistsApi.myList().then((r) => setMyPlaylists(r.data || [])).catch(() => setMyPlaylists([]));
   };
@@ -105,23 +99,24 @@ export default function TrackCard({
       .then((r) => {
         setMyPlaylists((prev) => [r.data, ...prev]);
         setNewPlaylistTitle('');
+        showToast('Плейлист создан', 'success');
       })
-      .catch((e) => setActionMessage(e.response?.data?.message || 'Не удалось создать плейлист'));
+      .catch((e) => showToast(e.response?.data?.message || 'Не удалось создать плейлист', 'error'));
   };
 
   const handleAddToPlaylist = (playlistId) => {
     playlistsApi.addTrack(playlistId, track._id)
       .then((r) => {
-        setActionMessage(r.data?.message || 'Добавлено');
+        showToast(r.data?.message || 'Добавлено', 'success');
         setShowPlaylist(false);
       })
-      .catch((e) => setActionMessage(e.response?.data?.message || 'Не удалось добавить трек'));
+      .catch((e) => showToast(e.response?.data?.message || 'Не удалось добавить трек', 'error'));
   };
 
   const handleSendReport = () => {
     if (!ensureAuth()) return;
     if (!reportText.trim() || reportText.trim().length < 10) {
-      setActionMessage('Опишите проблему (минимум 10 символов)');
+      showToast('Опишите проблему (минимум 10 символов)', 'error');
       return;
     }
     client.post(`/tracks/${track._id}/report`, {
@@ -132,9 +127,9 @@ export default function TrackCard({
         setShowReport(false);
         setReportText('');
         setReportKind('content');
-        setActionMessage(r.data?.message || 'Жалоба отправлена');
+        showToast(r.data?.message || 'Жалоба отправлена', 'success');
       })
-      .catch((e) => setActionMessage(e.response?.data?.message || 'Не удалось отправить жалобу'));
+      .catch((e) => showToast(e.response?.data?.message || 'Не удалось отправить жалобу', 'error'));
   };
 
   return (
@@ -174,8 +169,6 @@ export default function TrackCard({
         <button type="button" className="action-btn playlist" onClick={openPlaylistModal}>В плейлист</button>
         <button type="button" className="action-btn report" onClick={() => setShowReport(true)}>Жалоба</button>
       </div>
-      {actionMessage && <div className="track-action-msg">{actionMessage}</div>}
-
       {showReport && createPortal((
         <div className="card-overlay" onClick={() => setShowReport(false)}>
           <div className="card-modal" onClick={(e) => e.stopPropagation()}>
