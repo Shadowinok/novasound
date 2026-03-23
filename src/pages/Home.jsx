@@ -14,7 +14,19 @@ export default function Home() {
   useEffect(() => {
     client.get('/tracks', { params: { limit: 8, sort: '-createdAt' } }).then(r => setLatest(r.data.tracks || [])).catch(() => {});
     charts.weekly().then(r => setPopular((r.data || []).slice(0, 6))).catch(() => {});
-    playlists.list().then(r => setPlaylistList((r.data || []).slice(0, 4))).catch(() => {});
+    playlists
+      .featured(6)
+      .then((r) => {
+        const arr = r.data || [];
+        if (arr.length) {
+          setPlaylistList(arr.slice(0, 6));
+          return;
+        }
+        return playlists.list().then((rr) => setPlaylistList((rr.data || []).slice(0, 6)));
+      })
+      .catch(() => {
+        playlists.list().then((rr) => setPlaylistList((rr.data || []).slice(0, 6))).catch(() => {});
+      });
   }, []);
 
   return (
@@ -26,16 +38,6 @@ export default function Home() {
           <span className="hero-sub-line">слушай, загружай, смотри чарты</span>
         </div>
       </section>
-      {popular.length > 0 && (
-        <section>
-          <h3 className="section-title">Популярное за неделю</h3>
-          <div className="track-grid">
-            {popular.map((t) => (
-              <TrackCard key={t._id} track={t} />
-            ))}
-          </div>
-        </section>
-      )}
       {playlistList.length > 0 && (
         <section>
           <div className="section-head">
@@ -51,6 +53,16 @@ export default function Home() {
                 />
                 <span className="playlist-title">{p.title}</span>
               </Link>
+            ))}
+          </div>
+        </section>
+      )}
+      {popular.length > 0 && (
+        <section>
+          <h3 className="section-title">Популярное за неделю</h3>
+          <div className="track-grid">
+            {popular.map((t) => (
+              <TrackCard key={t._id} track={t} />
             ))}
           </div>
         </section>
@@ -135,7 +147,7 @@ export default function Home() {
         }
         .playlist-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+          grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
           gap: 20px;
         }
         .playlist-card {

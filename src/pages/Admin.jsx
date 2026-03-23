@@ -27,6 +27,8 @@ export default function Admin() {
   const [plCoverFile, setPlCoverFile] = useState(null);
   const [plCoverInputKey, setPlCoverInputKey] = useState(0);
   const [plEditingId, setPlEditingId] = useState(null);
+  const [plFeaturedOnHome, setPlFeaturedOnHome] = useState(false);
+  const [plFeaturedOrder, setPlFeaturedOrder] = useState(100);
   const [plSaving, setPlSaving] = useState(false);
   const [plFormOk, setPlFormOk] = useState('');
   const [plFormErr, setPlFormErr] = useState('');
@@ -118,6 +120,8 @@ export default function Admin() {
     setPlCoverFile(null);
     setPlCoverInputKey((k) => k + 1);
     setPlEditingId(null);
+    setPlFeaturedOnHome(false);
+    setPlFeaturedOrder(100);
     if (clearMessages) {
       setPlFormOk('');
       setPlFormErr('');
@@ -130,6 +134,8 @@ export default function Admin() {
     setPlEditingId(p._id);
     setPlTitle(p.title || '');
     setPlDescription(p.description || '');
+    setPlFeaturedOnHome(!!p.featuredOnHome);
+    setPlFeaturedOrder(Number.isFinite(Number(p.featuredOrder)) ? Number(p.featuredOrder) : 100);
     setPlCoverFile(null);
     setPlCoverInputKey((k) => k + 1);
   };
@@ -146,6 +152,8 @@ export default function Admin() {
     const fd = new FormData();
     fd.append('title', title);
     fd.append('description', plDescription.trim());
+    fd.append('featuredOnHome', plFeaturedOnHome ? 'true' : 'false');
+    fd.append('featuredOrder', String(plFeaturedOrder));
     if (!plEditingId) {
       fd.append('tracks', JSON.stringify([]));
     }
@@ -189,6 +197,24 @@ export default function Admin() {
         fetchPlaylists();
       })
       .catch((err) => setPlFormErr(err.response?.data?.message || 'Не удалось удалить'))
+      .finally(() => setPlSaving(false));
+  };
+
+  const handleTogglePlaylistFeatured = (playlist) => {
+    if (!playlist?._id) return;
+    setPlSaving(true);
+    setPlFormErr('');
+    setPlFormOk('');
+    playlistsApi
+      .update(playlist._id, {
+        featuredOnHome: !playlist.featuredOnHome,
+        featuredOrder: Number.isFinite(Number(playlist.featuredOrder)) ? Number(playlist.featuredOrder) : 100
+      })
+      .then(() => {
+        setPlFormOk(!playlist.featuredOnHome ? 'Плейлист добавлен на главную' : 'Плейлист убран с главной');
+        fetchPlaylists();
+      })
+      .catch((err) => setPlFormErr(err.response?.data?.message || 'Не удалось обновить выбор для главной'))
       .finally(() => setPlSaving(false));
   };
 
@@ -381,6 +407,26 @@ export default function Admin() {
                 maxLength={1000}
               />
             </label>
+            <label className="admin-pl-checkbox">
+              <input
+                type="checkbox"
+                checked={plFeaturedOnHome}
+                onChange={(e) => setPlFeaturedOnHome(e.target.checked)}
+              />
+              Показывать на главной
+            </label>
+            <label className="admin-pl-label">
+              Порядок на главной (меньше = выше)
+              <input
+                type="number"
+                min="0"
+                max="9999"
+                step="1"
+                className="admin-comment-input admin-pl-field"
+                value={plFeaturedOrder}
+                onChange={(e) => setPlFeaturedOrder(Number(e.target.value || 0))}
+              />
+            </label>
             <label className="admin-pl-label">
               Обложка {plEditingId ? '(новый файл заменит текущую)' : '(опционально)'}
               <input
@@ -419,6 +465,7 @@ export default function Admin() {
                     <div className="admin-playlist-card-meta">
                       Треков: {Array.isArray(p.tracks) ? p.tracks.length : 0}
                       <span className="admin-pl-badge pub">В каталоге</span>
+                      {p.featuredOnHome && <span className="admin-pl-badge home">На главной</span>}
                     </div>
                     <div className="admin-playlist-card-actions">
                       <Link to={`/playlist/${p._id}`} className="admin-pl-link" target="_blank" rel="noreferrer">
@@ -426,6 +473,14 @@ export default function Admin() {
                       </Link>
                       <button type="button" className="admin-btn admin-pl-edit" onClick={() => startEditPlaylist(p)}>
                         Редактировать
+                      </button>
+                      <button
+                        type="button"
+                        className="admin-btn admin-pl-feature"
+                        onClick={() => handleTogglePlaylistFeatured(p)}
+                        disabled={plSaving}
+                      >
+                        {p.featuredOnHome ? 'Убрать с главной' : 'На главную'}
                       </button>
                       <button
                         type="button"
@@ -699,6 +754,14 @@ export default function Admin() {
           font-size: 0.85rem;
           color: var(--text-dim);
         }
+        .admin-pl-checkbox {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 12px;
+          font-size: 0.86rem;
+          color: var(--text-dim);
+        }
         .admin-pl-field { margin-bottom: 0 !important; max-width: none !important; width: 100%; }
         .admin-pl-textarea {
           width: 100%;
@@ -792,6 +855,7 @@ export default function Admin() {
         }
         .admin-pl-badge.pub { color: #69db7c; border-color: rgba(0, 255, 100, 0.35); }
         .admin-pl-badge.priv { color: #ffc800; }
+        .admin-pl-badge.home { color: #ffd65a; border-color: rgba(255, 200, 0, 0.45); }
         .admin-playlist-card-actions {
           display: flex;
           flex-wrap: wrap;
@@ -806,6 +870,11 @@ export default function Admin() {
         .admin-pl-edit {
           background: rgba(120, 120, 255, 0.2) !important;
           color: #b9b9ff !important;
+          flex: 0 1 auto;
+        }
+        .admin-pl-feature {
+          background: rgba(255, 200, 0, 0.18) !important;
+          color: #ffd65a !important;
           flex: 0 1 auto;
         }
         .admin-message {
