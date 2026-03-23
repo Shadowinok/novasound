@@ -32,6 +32,7 @@ export function PlayerProvider({ children }) {
   const repeatModeRef = useRef('all');
   const seekHoldUntilRef = useRef(0);
   const seekTargetRef = useRef(0);
+  const lastSeekApplyAtRef = useRef(0);
 
   const normalizeQueue = useCallback((list, fallbackTrack) => {
     const arr = Array.isArray(list) ? list.filter(Boolean) : [];
@@ -104,6 +105,7 @@ export function PlayerProvider({ children }) {
     setCurrentTrack(track);
     seekHoldUntilRef.current = 0;
     seekTargetRef.current = 0;
+    lastSeekApplyAtRef.current = 0;
     setProgress(0);
     setBuffered(0);
     setDuration(track.duration || 0);
@@ -182,6 +184,7 @@ export function PlayerProvider({ children }) {
       setPlaying(false);
       seekHoldUntilRef.current = 0;
       seekTargetRef.current = 0;
+      lastSeekApplyAtRef.current = 0;
       setProgress(0);
       setBuffered(0);
       setDuration(0);
@@ -227,12 +230,18 @@ export function PlayerProvider({ children }) {
   const seek = useCallback((value) => {
     if (!howlRef.current) return;
     const next = Math.max(0, Number(value) || 0);
+    const h = howlRef.current;
     seekTargetRef.current = next;
-    // Короткая защита от "отката" UI, пока движок догружает новый offset.
-    seekHoldUntilRef.current = Date.now() + 1200;
-    howlRef.current.seek(next);
+    // Держим позицию дольше, если seek в непрогруженную область.
+    seekHoldUntilRef.current = Date.now() + 6000;
+    lastSeekApplyAtRef.current = Date.now();
+    h.seek(next);
+    // Если трек играл, в некоторых браузерах после seek нужен явный play().
+    if (playing && !h.playing()) {
+      h.play();
+    }
     setProgress(next);
-  }, []);
+  }, [playing]);
 
   /** Остановить и убрать плеер с экрана */
   const closePlayer = useCallback(() => {
@@ -244,6 +253,7 @@ export function PlayerProvider({ children }) {
     setPlaying(false);
     seekHoldUntilRef.current = 0;
     seekTargetRef.current = 0;
+    lastSeekApplyAtRef.current = 0;
     setProgress(0);
     setBuffered(0);
     setDuration(0);
@@ -271,12 +281,17 @@ export function PlayerProvider({ children }) {
         }
       }
       const now = Date.now();
-      if (now < seekHoldUntilRef.current && pos + 0.2 < seekTargetRef.current) {
+      if (now < seekHoldUntilRef.current && pos + 0.25 < seekTargetRef.current) {
+        // Периодически повторяем seek, чтобы браузер активнее запросил нужный диапазон.
+        if (now - lastSeekApplyAtRef.current > 900) {
+          h.seek(seekTargetRef.current);
+          lastSeekApplyAtRef.current = now;
+        }
         setProgress(seekTargetRef.current);
         return;
       }
       setProgress(pos);
-      if (pos + 0.2 >= seekTargetRef.current) {
+      if (pos + 0.25 >= seekTargetRef.current) {
         seekHoldUntilRef.current = 0;
       }
     };
