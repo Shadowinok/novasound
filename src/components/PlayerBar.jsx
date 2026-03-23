@@ -135,12 +135,18 @@ export default function PlayerBar() {
             step="any"
             value={sliderValue}
             disabled={!duration || duration <= 0}
-            onChange={(e) => {
+            onInput={(e) => {
               const v = Number(e.target.value);
               if (!Number.isFinite(v)) return;
               setSeekDraft(v);
               seekDraftRef.current = v;
               if (!isSeeking && duration > 0) commitSeek(v);
+            }}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              if (!Number.isFinite(v)) return;
+              setSeekDraft(v);
+              seekDraftRef.current = v;
             }}
             onPointerDown={(e) => {
               e.stopPropagation();
@@ -155,7 +161,7 @@ export default function PlayerBar() {
             onPointerUp={(e) => {
               e.stopPropagation();
               seekingRef.current = false;
-              commitSeek(seekDraftRef.current);
+              commitSeek(e.currentTarget.value);
               setIsSeeking(false);
               if (e.currentTarget.releasePointerCapture) {
                 try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (_) {}
