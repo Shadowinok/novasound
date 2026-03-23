@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { usePlayer } from '../context/PlayerContext';
 
 const items = [
   { path: '/', label: 'Главная', icon: '⌂' },
@@ -15,22 +16,26 @@ const items = [
 export default function RadialMenu({ user, isAdmin }) {
   const [open, setOpen] = useState(false);
   const location = useLocation();
+  const { currentTrack } = usePlayer();
   const filtered = items.filter(i => {
     if (i.admin && !isAdmin) return false;
     if (i.auth && !user) return false;
     return true;
   });
-  const radius = 152;
+  /** Дуга пунктов (px). Раньше было дублирование margin + transform — края вылезали за экран. */
+  const radius = 84;
   const count = filtered.length;
-  const angleStep = (Math.PI * 0.92) / Math.max(1, count - 1);
-  const startAngle = Math.PI * 0.02;
-  const itemSize = 40;
+  const angleStep = (Math.PI * 0.85) / Math.max(1, count - 1);
+  const startAngle = -Math.PI * 0.1;
+  const itemSize = 48;
   const half = itemSize / 2;
-  const toggleSize = 82;
-  const toggleCenter = toggleSize / 2;
 
   return (
-    <nav className="radial-menu" aria-label="Основная навигация">
+    <nav
+      className="radial-menu"
+      data-player-active={currentTrack ? 'true' : 'false'}
+      aria-label="Основная навигация"
+    >
       <AnimatePresence>
         {open && (
           <>
@@ -41,29 +46,26 @@ export default function RadialMenu({ user, isAdmin }) {
               const isActive = location.pathname === item.path || (item.path === '/' && location.pathname === '/');
               return (
                 <motion.div
-                  key={item.path}
+                  key={ item.path }
                   className="radial-menu-node"
-                  initial={{ opacity: 0, scale: 0.7, x: 0, y: 0 }}
+                  initial={{ opacity: 0, scale: 0, x: 0, y: 0 }}
                   animate={{ opacity: 1, scale: 1, x, y }}
-                  exit={{ opacity: 0, scale: 0.7, x: 0, y: 0 }}
-                  transition={{ type: 'spring', stiffness: 320, damping: 24 }}
+                  exit={{ opacity: 0, scale: 0, x: 0, y: 0 }}
+                  transition={{ type: 'spring', stiffness: 260, damping: 22 }}
                   style={{
                     position: 'absolute',
-                    left: toggleCenter,
-                    top: toggleCenter,
+                    left: '50%',
+                    top: '50%',
                     width: itemSize,
                     height: itemSize,
                     marginLeft: -half,
-                    marginTop: -half,
-                    zIndex: 2
+                    marginTop: -half
                   }}
                 >
                   <Link
                     to={item.path}
                     className={`radial-item ${isActive ? 'active' : ''}`}
                     onClick={() => setOpen(false)}
-                    title={item.label}
-                    aria-label={item.label}
                   >
                     <span className="radial-icon">{item.icon}</span>
                     <span className="radial-label">{item.label}</span>
@@ -88,99 +90,89 @@ export default function RadialMenu({ user, isAdmin }) {
       <style>{`
         .radial-menu {
           position: fixed;
-          top: calc(96px + env(safe-area-inset-top, 0px));
-          left: 16px;
-          z-index: 120;
-          width: min(78vw, 260px);
-          height: min(62vh, 260px);
+          bottom: calc(24px + var(--footer-dock-height, 30px) + env(safe-area-inset-bottom, 0px));
+          left: 50%;
+          transform: translateX(-50%);
+          /* 2 * radius + item + запас, чтобы «Кабинет» и крайние пункты не резались */
+          width: min(92vw, 300px);
+          height: min(42vw, 200px);
+          max-height: 220px;
+          z-index: 100;
+          display: flex;
+          align-items: center;
+          justify-content: center;
           pointer-events: none;
         }
         .radial-menu .radial-toggle,
-        .radial-menu .radial-menu-node { pointer-events: auto; }
+        .radial-menu .radial-menu-node {
+          pointer-events: auto;
+        }
+        /* Когда плеер открыт — поднимаем меню над полосой плеера, не перекрываем кнопки */
+        .radial-menu[data-player-active="true"] {
+          bottom: calc(96px + var(--footer-dock-height, 30px) + env(safe-area-inset-bottom, 0px));
+        }
+        @media (max-width: 768px) {
+          .radial-menu[data-player-active="true"] {
+            bottom: calc(108px + var(--footer-dock-height, 30px) + env(safe-area-inset-bottom, 0px));
+          }
+        }
+        @media (orientation: landscape) and (max-height: 500px) {
+          .radial-menu {
+            left: auto;
+            right: 10px;
+            transform: none;
+            bottom: calc(12px + var(--footer-dock-height, 30px) + env(safe-area-inset-bottom, 0px));
+            width: 120px;
+            height: 120px;
+          }
+          .radial-menu[data-player-active="true"] {
+            bottom: calc(72px + var(--footer-dock-height, 30px) + env(safe-area-inset-bottom, 0px));
+          }
+        }
         .radial-toggle {
-          width: 82px;
-          height: 82px;
+          width: 100px;
+          height: 100px;
           border-radius: 50%;
           border: 2px solid var(--neon-cyan);
-          background: rgba(5, 217, 232, 0.12);
+          background: rgba(5, 217, 232, 0.1);
           color: var(--neon-cyan);
           font-family: var(--font-display);
           font-weight: 700;
-          font-size: 0.74rem;
+          font-size: 0.9rem;
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
           box-shadow: var(--glow-cyan);
-          position: relative;
-          z-index: 1;
         }
         .radial-toggle .accent { color: var(--neon-pink); }
         .radial-item {
           position: absolute;
           left: 0;
           top: 0;
-          width: 100%;
-          height: 100%;
+          width: 48px;
+          height: 48px;
           border-radius: 50%;
-          border: 1px solid var(--neon-purple);
           background: var(--bg-card);
+          border: 1px solid var(--neon-purple);
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
           color: var(--text);
-          text-decoration: none;
-          font-size: 0.62rem;
+          font-size: 0.7rem;
+          box-shadow: 0 0 15px rgba(211,0,197,0.3);
           transition: all 0.2s;
-          box-shadow: 0 0 15px rgba(211, 0, 197, 0.3);
-          text-align: center;
-          padding: 4px;
         }
         .radial-item:hover, .radial-item.active {
           border-color: var(--neon-pink);
           box-shadow: var(--glow-pink);
           color: var(--neon-pink);
         }
-        .radial-icon {
-          font-size: 0.95rem;
-          line-height: 1;
-        }
-        .radial-label {
-          margin-top: 2px;
-          font-size: 0.56rem;
-          line-height: 1.1;
-        }
-
+        .radial-icon { font-size: 1.1rem; }
+        .radial-label { margin-top: 2px; }
         @media (max-width: 768px) {
-          .radial-menu {
-            top: calc(84px + env(safe-area-inset-top, 0px));
-            left: 10px;
-            width: min(86vw, 230px);
-            height: min(56vh, 230px);
-          }
-          .radial-toggle {
-            width: 74px;
-            height: 74px;
-            font-size: 0.68rem;
-          }
-          .radial-item {
-            font-size: 0.64rem;
-          }
-          .radial-icon {
-            font-size: 0.95rem;
-          }
-        }
-        @media (orientation: landscape) and (max-height: 500px) {
-          .radial-menu {
-            width: 210px;
-            height: 190px;
-          }
-          .radial-toggle {
-            width: 68px;
-            height: 68px;
-            font-size: 0.64rem;
-          }
+          .radial-toggle { width: 80px; height: 80px; font-size: 0.75rem; }
         }
       `}</style>
     </nav>
