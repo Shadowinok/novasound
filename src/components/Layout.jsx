@@ -30,22 +30,23 @@ export default function Layout() {
       <div className="layout-shell">
         <header className="header">
           <div className="header-inner">
-            <div className="auth-links">
-              {user ? (
-                <div className="user-box">
-                  <span className="user-name">{user.username}</span>
-                  <span className="msk-clock">MSK {mskTime}</span>
-                </div>
-              ) : (
-                <>
+            <div className="header-spacer" aria-hidden="true" />
+            <div className="header-center">
+              {!user ? (
+                <div className="auth-links">
                   <a href="/login" className="nav-link">Вход</a>
                   <a href="/register" className="nav-link">Регистрация</a>
-                </>
+                </div>
+              ) : (
+                <span className="user-name">{user.username}</span>
               )}
             </div>
-            <h1 className="site-title">
-              <span className="neon-pink">Nova</span><span className="neon-cyan">Sound</span>
-            </h1>
+            <div className="header-brand">
+              <h1 className="site-title">
+                <span className="neon-pink">Nova</span><span className="neon-cyan">Sound</span>
+              </h1>
+              <span className="msk-clock">MSK {mskTime}</span>
+            </div>
           </div>
         </header>
         <main className="main">

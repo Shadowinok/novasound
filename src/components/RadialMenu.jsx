@@ -75,12 +75,15 @@ export default function RadialMenu({ user, isAdmin }) {
       <style>{`
         .radial-menu {
           position: fixed;
-          top: 0;
-          left: 0;
-          transform: none;
+          top: 0 !important;
+          left: 0 !important;
+          right: auto !important;
+          bottom: auto !important;
+          margin: 0 !important;
+          transform: none !important;
           width: 180px;
           height: 120px;
-          z-index: 100;
+          z-index: 130;
           display: flex;
           align-items: center;
           justify-content: center;
