@@ -20,11 +20,11 @@ export default function RadialMenu({ user, isAdmin }) {
     if (i.auth && !user) return false;
     return true;
   });
-  const radius = 124;
+  const radius = 152;
   const count = filtered.length;
-  const angleStep = (Math.PI * 0.64) / Math.max(1, count - 1);
-  const startAngle = -Math.PI * 0.58;
-  const itemSize = 44;
+  const angleStep = (Math.PI * 0.92) / Math.max(1, count - 1);
+  const startAngle = Math.PI * 0.02;
+  const itemSize = 40;
   const half = itemSize / 2;
   const toggleSize = 82;
   const toggleCenter = toggleSize / 2;
@@ -88,7 +88,7 @@ export default function RadialMenu({ user, isAdmin }) {
       <style>{`
         .radial-menu {
           position: fixed;
-          top: calc(42px + env(safe-area-inset-top, 0px));
+          top: calc(96px + env(safe-area-inset-top, 0px));
           left: 16px;
           z-index: 120;
           width: min(78vw, 260px);
@@ -131,7 +131,7 @@ export default function RadialMenu({ user, isAdmin }) {
           justify-content: center;
           color: var(--text);
           text-decoration: none;
-          font-size: 0.68rem;
+          font-size: 0.62rem;
           transition: all 0.2s;
           box-shadow: 0 0 15px rgba(211, 0, 197, 0.3);
           text-align: center;
@@ -143,18 +143,18 @@ export default function RadialMenu({ user, isAdmin }) {
           color: var(--neon-pink);
         }
         .radial-icon {
-          font-size: 1.05rem;
+          font-size: 0.95rem;
           line-height: 1;
         }
         .radial-label {
           margin-top: 2px;
-          font-size: 0.6rem;
+          font-size: 0.56rem;
           line-height: 1.1;
         }
 
         @media (max-width: 768px) {
           .radial-menu {
-            top: calc(34px + env(safe-area-inset-top, 0px));
+            top: calc(84px + env(safe-area-inset-top, 0px));
             left: 10px;
             width: min(86vw, 230px);
             height: min(56vh, 230px);
