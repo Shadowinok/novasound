@@ -194,9 +194,63 @@ export const playlists = {
   },
   addTrack: (playlistId, trackId) => client.post(`/playlists/${playlistId}/tracks/${trackId}`),
   removeTrack: (playlistId, trackId) => client.delete(`/playlists/${playlistId}/tracks/${trackId}`),
-  create: (formData) => client.post('/playlists', formData, { headers: formData instanceof FormData ? {} : { 'Content-Type': 'application/json' } }),
+  create: async (data) => {
+    if (!(data instanceof FormData)) {
+      return client.post('/playlists', data, { headers: { 'Content-Type': 'application/json' } });
+    }
+    const token = typeof localStorage !== 'undefined' ? localStorage.getItem('novasound_token') : null;
+    const base = getApiBase().replace(/\/$/, '');
+    const url = `${base}/playlists`;
+    const { status, data: body } = await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url, true);
+      if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      xhr.onload = () => {
+        let parsed = {};
+        try {
+          parsed = xhr.responseText ? JSON.parse(xhr.responseText) : {};
+        } catch (_) {
+          parsed = { message: xhr.status >= 400 ? `Ошибка сервера (${xhr.status})` : '' };
+        }
+        resolve({ status: xhr.status, data: parsed });
+      };
+      xhr.onerror = () => reject(new Error('Нет связи с сервером (сеть/CORS)'));
+      xhr.send(data);
+    });
+    if (status < 200 || status >= 300) {
+      const err = new Error(body.message || 'Не удалось создать плейлист');
+      err.response = { status, data: body };
+      throw err;
+    }
+    return { data: body };
+  },
   update: (id, data) => {
-    if (data instanceof FormData) return client.put(`/playlists/${id}`, data);
+    if (data instanceof FormData) {
+      const idStr = String(id ?? '').trim();
+      const token = typeof localStorage !== 'undefined' ? localStorage.getItem('novasound_token') : null;
+      const base = getApiBase().replace(/\/$/, '');
+      const url = `${base}/playlists/${encodeURIComponent(idStr)}`;
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        // POST-дубль на бэке: устойчивее для multipart, чем PUT через edge/proxy.
+        xhr.open('POST', url, true);
+        if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        xhr.onload = () => {
+          let parsed = {};
+          try {
+            parsed = xhr.responseText ? JSON.parse(xhr.responseText) : {};
+          } catch (_) {
+            parsed = { message: xhr.status >= 400 ? `Ошибка сервера (${xhr.status})` : '' };
+          }
+          if (xhr.status >= 200 && xhr.status < 300) return resolve({ data: parsed });
+          const err = new Error(parsed.message || 'Не удалось обновить плейлист');
+          err.response = { status: xhr.status, data: parsed };
+          reject(err);
+        };
+        xhr.onerror = () => reject(new Error('Нет связи с сервером (сеть/CORS)'));
+        xhr.send(data);
+      });
+    }
     return client.put(`/playlists/${id}`, data);
   },
   delete: (id) => client.delete(`/playlists/${id}`)
