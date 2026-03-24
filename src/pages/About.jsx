@@ -10,7 +10,7 @@ export default function About() {
       <h1 className="page-title about-main-title">О проекте</h1>
       <div className="about-body">
         <p className="about-lead">
-          NovaSound задуман как площадка, где на первом плане — <strong>нейросети и музыка</strong>: инструменты,
+          <span className="brand-nova">Nova</span><span className="brand-sound">Sound</span> задуман как площадка, где на первом плане — <strong>нейросети и музыка</strong>: инструменты,
           честность про возможности и ограничения моделей, сообщество вокруг этого. Здесь можно слушать и выкладывать
           треки, в том числе сделанные с ИИ — сервис держит рамку: <strong>это про ИИ и людей</strong>, а не безликий
           хостинг файлов. Мы называем это <strong>диалогом ИИ и людей</strong> — без мистификации «магии кнопки», с
@@ -22,6 +22,8 @@ export default function About() {
           width: 100%;
           text-align: center;
         }
+        .brand-nova { color: var(--neon-pink); }
+        .brand-sound { color: var(--neon-cyan); }
         .about-body {
           max-width: 720px;
           margin: 0 auto;

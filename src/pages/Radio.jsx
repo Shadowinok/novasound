@@ -9,7 +9,9 @@ export default function Radio() {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="page radio-page">
       <header className="radio-header">
-        <h1 className="page-title radio-main-title">NovaSound Radio</h1>
+        <h1 className="page-title radio-main-title">
+          <span className="brand-nova">Nova</span><span className="brand-sound">Sound</span> Radio
+        </h1>
         <p className="radio-tagline">Интернет-станция про ИИ и музыку — в разработке</p>
       </header>
 
@@ -39,6 +41,8 @@ export default function Radio() {
           width: 100%;
           text-align: center;
         }
+        .brand-nova { color: var(--neon-pink); }
+        .brand-sound { color: var(--neon-cyan); }
         .radio-tagline {
           text-align: center;
           color: var(--neon-cyan);

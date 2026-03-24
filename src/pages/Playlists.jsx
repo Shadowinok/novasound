@@ -36,7 +36,7 @@ export default function Playlists() {
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="page playlists-page">
       <h2 className="page-title">Плейлисты</h2>
       <p className="playlists-lead">
-        Подборки редакции NovaSound. Собрать свой список можно в личном кабинете.
+        Подборки редакции <span className="brand-nova">Nova</span><span className="brand-sound">Sound</span>. Собрать свой список можно в личном кабинете.
       </p>
       <div className="playlists-toolbar">
         <input
@@ -105,6 +105,8 @@ export default function Playlists() {
           max-width: 560px;
           margin: 0 0 24px;
         }
+        .brand-nova { color: var(--neon-pink); }
+        .brand-sound { color: var(--neon-cyan); }
         .playlists-toolbar {
           display: flex;
           flex-wrap: wrap;
