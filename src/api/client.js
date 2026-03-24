@@ -76,6 +76,7 @@ export const users = {
 
 export const tracks = {
   list: (params) => client.get('/tracks', { params }),
+  radioNow: (params) => client.get('/tracks/radio/now', { params }),
   get: (id) => client.get(`/tracks/${id}`),
   my: (params) => client.get('/tracks/my', { params }),
   myReports: () => client.get('/tracks/my/reports'),
