@@ -160,17 +160,16 @@ export default function PlayerBar() {
               {volumeIcon}
             </span>
           </button>
-          {!isRadioMode && (
-            <button
-              type="button"
-              className={`player-btn repeat-btn mode-${repeatMode}`}
-              onClick={cycleRepeatMode}
-              aria-label="Режим повтора"
-              title="Режим повтора"
-            >
-              {repeatLabel}
-            </button>
-          )}
+          <button
+            type="button"
+            className={`player-btn repeat-btn mode-${repeatMode}`}
+            onClick={cycleRepeatMode}
+            aria-label="Режим повтора"
+            title="Режим повтора"
+            disabled={isRadioMode}
+          >
+            {repeatLabel}
+          </button>
           <button
             type="button"
             className="player-close"
