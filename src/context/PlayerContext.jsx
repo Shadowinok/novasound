@@ -13,6 +13,7 @@ export function PlayerProvider({ children }) {
   const [queueIndex, setQueueIndex] = useState(0);
   // one | one-repeat | all | all-repeat
   const [repeatMode, setRepeatMode] = useState('all');
+  const [isRadioMode, setIsRadioMode] = useState(false);
   const [volume, setVolume] = useState(() => {
     const saved = Number(localStorage.getItem('novasound_volume'));
     if (Number.isFinite(saved) && saved >= 0 && saved <= 1) return saved;
@@ -48,6 +49,7 @@ export function PlayerProvider({ children }) {
     setDuration(0);
     setQueue([]);
     setQueueIndex(0);
+    setIsRadioMode(false);
     queueRef.current = [];
     queueIndexRef.current = 0;
   }, []);
@@ -158,6 +160,11 @@ export function PlayerProvider({ children }) {
       playQueueTrack(null, [], 0);
       return;
     }
+    const radioMode = Boolean(options.isRadio);
+    setIsRadioMode(radioMode);
+    if (radioMode) {
+      setRepeatMode('all-repeat');
+    }
     const q = normalizeQueue(options.queue, track);
     let idx = Number.isFinite(options.startIndex) ? Number(options.startIndex) : q.findIndex((t) => String(t?._id) === String(track._id));
     if (idx < 0) idx = 0;
@@ -201,13 +208,14 @@ export function PlayerProvider({ children }) {
   }, [playQueueTrack]);
 
   const cycleRepeatMode = useCallback(() => {
+    if (isRadioMode) return;
     setRepeatMode((prev) => {
       if (prev === 'one') return 'one-repeat';
       if (prev === 'one-repeat') return 'all';
       if (prev === 'all') return 'all-repeat';
       return 'one';
     });
-  }, []);
+  }, [isRadioMode]);
 
   useEffect(() => {
     repeatModeRef.current = repeatMode;
@@ -298,6 +306,7 @@ export function PlayerProvider({ children }) {
       queue,
       queueIndex,
       repeatMode,
+      isRadioMode,
       volume,
       loadTrack,
       togglePlay,
