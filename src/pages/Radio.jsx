@@ -8,10 +8,15 @@ import { usePlayer } from '../context/PlayerContext';
  * Этап 0 из docs/развитие радио.md — честный статус без фейкового «эфира»
  */
 export default function Radio() {
-  const { loadTrack } = usePlayer();
+  const { loadTrack, currentTrack, queue, queueIndex, isRadioMode } = usePlayer();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [radio, setRadio] = useState({ now: null, next: [], history: [], queue: [], nowOffsetSec: 0 });
+
+  const activeNow = isRadioMode && currentTrack ? currentTrack : radio.now;
+  const activeNext = isRadioMode && Array.isArray(queue) && queue.length
+    ? queue.slice(queueIndex + 1, queueIndex + 6)
+    : radio.next;
 
   const loadRadio = useCallback(async (opts = {}) => {
     const resyncPlayback = Boolean(opts.resyncPlayback);
@@ -76,18 +81,23 @@ export default function Radio() {
       <div className="radio-body">
         <section className="radio-block radio-now">
           <h2>Сейчас</h2>
+          {loading && (
+            <div className="radio-loading" aria-live="polite" aria-label="Синхронизация эфира">
+              <span className="radio-spinner" aria-hidden />
+            </div>
+          )}
           {error ? (
             <p>{error}</p>
-          ) : !radio.now ? (
+          ) : !activeNow ? (
             <p>Эфир оффлайн</p>
           ) : (
             <>
               <p>
-                В эфире: <b>{radio.now.title}</b> — {radio.now.author?.username || 'Неизвестный автор'}
+                В эфире: <b>{activeNow.title}</b> — {activeNow.author?.username || 'Неизвестный автор'}
               </p>
-              {!!radio.next.length && (
+              {!!activeNext.length && (
                 <ul>
-                  {radio.next.map((t) => (
+                  {activeNext.map((t) => (
                     <li key={t._id}>{t.title} — {t.author?.username || 'Автор'}</li>
                   ))}
                 </ul>
@@ -151,6 +161,25 @@ export default function Radio() {
           margin-bottom: 28px;
           line-height: 1.6;
           color: var(--text);
+        }
+        .radio-loading {
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          color: var(--text-dim);
+          margin-bottom: 10px;
+        }
+        .radio-spinner {
+          width: 14px;
+          height: 14px;
+          border-radius: 50%;
+          border: 2px solid rgba(5, 217, 232, 0.25);
+          border-top-color: var(--neon-cyan);
+          animation: radioSpin .8s linear infinite;
+        }
+        @keyframes radioSpin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
         .radio-block h2 {
           font-size: 1.1rem;
