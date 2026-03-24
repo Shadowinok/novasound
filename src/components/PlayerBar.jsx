@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Slider from 'rc-slider';
+import 'rc-slider/assets/index.css';
 import { usePlayer } from '../context/PlayerContext';
 
 export default function PlayerBar() {
@@ -25,8 +27,6 @@ export default function PlayerBar() {
   const [isSeeking, setIsSeeking] = useState(false);
   const [seekDraft, setSeekDraft] = useState(0);
   const volumeWrapRef = useRef(null);
-  const seekDraftRef = useRef(0);
-  const seekActiveRef = useRef(false);
 
   const commitSeek = (value) => {
     if (!(duration > 0)) return;
@@ -34,19 +34,11 @@ export default function PlayerBar() {
     if (!Number.isFinite(numeric)) return;
     seek(numeric);
     setSeekDraft(numeric);
-    seekDraftRef.current = numeric;
-  };
-
-  const finishSeekIfActive = (withCommit = true) => {
-    if (!seekActiveRef.current) return;
-    seekActiveRef.current = false;
-    if (withCommit) commitSeek(seekDraftRef.current);
-    setIsSeeking(false);
   };
 
   useEffect(() => {
-    seekDraftRef.current = seekDraft;
-  }, [seekDraft]);
+    if (!isSeeking) setSeekDraft(duration > 0 ? Math.min(progress, duration) : 0);
+  }, [progress, duration, isSeeking]);
 
   useEffect(() => {
     if (!volumeOpen) return;
@@ -127,7 +119,6 @@ export default function PlayerBar() {
           <button
             type="button"
             className="player-btn play-pause"
-            onPointerDown={() => finishSeekIfActive(false)}
             onClick={togglePlay}
           >
             {playing ? '⏸' : '▶'}
@@ -136,75 +127,23 @@ export default function PlayerBar() {
             ⏭
           </button>
           <span className="player-time">{formatTime(progress)}</span>
-          <input
-            type="range"
-            min={0}
-            max={maxDuration}
-            step="any"
-            value={sliderValue}
-            style={sliderTrackStyle}
-            disabled={!duration || duration <= 0}
-            onInput={(e) => {
-              const v = Number(e.target.value);
-              if (!Number.isFinite(v)) return;
-              setSeekDraft(v);
-              seekDraftRef.current = v;
-            }}
-            onChange={(e) => {
-              const v = Number(e.target.value);
-              if (!Number.isFinite(v)) return;
-              setSeekDraft(v);
-              seekDraftRef.current = v;
-            }}
-            onPointerDown={(e) => {
-              e.stopPropagation();
-              seekActiveRef.current = true;
-              setIsSeeking(true);
-              const v = Number(e.currentTarget.value);
-              const next = Number.isFinite(v) ? v : sliderValue;
-              setSeekDraft(next);
-              seekDraftRef.current = next;
-              if (e.currentTarget.setPointerCapture) {
-                try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
-              }
-            }}
-            onPointerUp={(e) => {
-              e.stopPropagation();
-              seekActiveRef.current = false;
-              commitSeek(e.currentTarget.value);
-              setIsSeeking(false);
-              if (e.currentTarget.releasePointerCapture) {
-                try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (_) {}
-              }
-            }}
-            onPointerCancel={(e) => {
-              e.stopPropagation();
-              seekActiveRef.current = false;
-              setIsSeeking(false);
-            }}
-            onLostPointerCapture={() => {
-              if (!seekActiveRef.current) return;
-              seekActiveRef.current = false;
-              commitSeek(seekDraftRef.current);
-              setIsSeeking(false);
-            }}
-            onBlur={() => {
-              if (!isSeeking) return;
-              seekActiveRef.current = false;
-              setIsSeeking(false);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'Home' || e.key === 'End') {
-                setIsSeeking(true);
-              }
-            }}
-            onKeyUp={() => {
-              commitSeek(seekDraftRef.current);
-              setIsSeeking(false);
-            }}
-            className="player-slider"
-            aria-label="Прогресс воспроизведения"
-          />
+          <div className="player-slider-wrap" style={sliderTrackStyle}>
+            <Slider
+              min={0}
+              max={maxDuration}
+              step={0.01}
+              value={sliderValue}
+              disabled={!duration || duration <= 0}
+              onBeforeChange={() => setIsSeeking(true)}
+              onChange={(v) => setSeekDraft(Number(v) || 0)}
+              onAfterChange={(v) => {
+                commitSeek(Number(v) || 0);
+                setIsSeeking(false);
+              }}
+              className="player-slider"
+              ariaLabelForHandle="Прогресс воспроизведения"
+            />
+          </div>
           <span className="player-time">{formatTime(duration)}</span>
         </div>
         <div className="player-volume-wrap" ref={volumeWrapRef}>
@@ -435,21 +374,41 @@ export default function PlayerBar() {
             color: var(--text-dim);
             min-width: 36px;
           }
-          .player-slider {
+          .player-slider-wrap {
             flex: 1;
-            height: 6px;
-            -webkit-appearance: none;
-            background: rgba(255,255,255,0.1);
-            border-radius: 3px;
+            height: 8px;
+            border-radius: 999px;
+            padding: 1px 0;
+            display: flex;
+            align-items: center;
           }
-          .player-slider::-webkit-slider-thumb {
-            -webkit-appearance: none;
+          .player-slider {
+            width: 100%;
+            margin: 0;
+          }
+          .player-slider .rc-slider-rail,
+          .player-slider .rc-slider-track {
+            height: 6px;
+            border-radius: 999px;
+            background: transparent;
+          }
+          .player-slider .rc-slider-handle {
             width: 14px;
             height: 14px;
+            margin-top: -4px;
+            border: 0;
             border-radius: 50%;
             background: var(--neon-cyan);
             box-shadow: 0 0 10px var(--neon-cyan);
             cursor: pointer;
+          }
+          .player-slider .rc-slider-handle:focus-visible {
+            outline: 2px solid rgba(5, 217, 232, 0.5);
+            outline-offset: 2px;
+          }
+          .player-slider .rc-slider-handle-dragging.rc-slider-handle-dragging.rc-slider-handle-dragging {
+            box-shadow: 0 0 14px var(--neon-cyan);
+            border-color: transparent;
           }
           .volume-slider { width: 100%; max-width: none; min-width: 120px; }
           @media (max-width: 900px) {
