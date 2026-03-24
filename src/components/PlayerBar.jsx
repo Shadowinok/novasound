@@ -37,16 +37,20 @@ export default function PlayerBar() {
     seekDraftRef.current = numeric;
   };
 
+  const finishSeekIfActive = () => {
+    if (!seekActiveRef.current) return;
+    seekActiveRef.current = false;
+    commitSeek(seekDraftRef.current);
+    setIsSeeking(false);
+  };
+
   useEffect(() => {
     seekDraftRef.current = seekDraft;
   }, [seekDraft]);
 
   useEffect(() => {
     const finishSeek = () => {
-      if (!seekActiveRef.current) return;
-      seekActiveRef.current = false;
-      commitSeek(seekDraftRef.current);
-      setIsSeeking(false);
+      finishSeekIfActive();
     };
     window.addEventListener('pointerup', finishSeek, { passive: true });
     window.addEventListener('pointercancel', finishSeek, { passive: true });
@@ -132,7 +136,12 @@ export default function PlayerBar() {
           <button type="button" className="player-btn nav-btn" onClick={playPrev} disabled={!canPrev} aria-label="Предыдущий трек">
             ⏮
           </button>
-          <button type="button" className="player-btn play-pause" onClick={togglePlay}>
+          <button
+            type="button"
+            className="player-btn play-pause"
+            onPointerDown={() => finishSeekIfActive()}
+            onClick={togglePlay}
+          >
             {playing ? '⏸' : '▶'}
           </button>
           <button type="button" className="player-btn nav-btn" onClick={playNext} disabled={!canNext} aria-label="Следующий трек">
@@ -189,7 +198,6 @@ export default function PlayerBar() {
             onBlur={() => {
               if (!isSeeking) return;
               seekActiveRef.current = false;
-              commitSeek(seekDraftRef.current);
               setIsSeeking(false);
             }}
             onKeyDown={(e) => {
