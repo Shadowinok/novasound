@@ -30,9 +30,7 @@ export function PlayerProvider({ children }) {
   const queueRef = useRef([]);
   const queueIndexRef = useRef(0);
   const repeatModeRef = useRef('all');
-  const seekHoldUntilRef = useRef(0);
-  const seekTargetRef = useRef(0);
-  const pendingSeekRef = useRef(false);
+  const desiredPlayingRef = useRef(false);
 
   const normalizeQueue = useCallback((list, fallbackTrack) => {
     const arr = Array.isArray(list) ? list.filter(Boolean) : [];
@@ -96,12 +94,7 @@ export function PlayerProvider({ children }) {
       onpause: () => setPlaying(false),
       onseek: () => {
         const p = Number(howl.seek());
-        if (!Number.isFinite(p)) return;
-        setProgress(p);
-        if (p + 0.25 >= seekTargetRef.current) {
-          seekHoldUntilRef.current = 0;
-          pendingSeekRef.current = false;
-        }
+        if (Number.isFinite(p)) setProgress(p);
       }
     });
     howlRef.current = howl;
@@ -112,9 +105,7 @@ export function PlayerProvider({ children }) {
     setQueue(safeQueue);
     setQueueIndex(safeIndex);
     setCurrentTrack(track);
-    seekHoldUntilRef.current = 0;
-    seekTargetRef.current = 0;
-    pendingSeekRef.current = false;
+    desiredPlayingRef.current = true;
     setProgress(0);
     setBuffered(0);
     setDuration(track.duration || 0);
@@ -191,9 +182,7 @@ export function PlayerProvider({ children }) {
       }
       setCurrentTrack(null);
       setPlaying(false);
-      seekHoldUntilRef.current = 0;
-      seekTargetRef.current = 0;
-      pendingSeekRef.current = false;
+      desiredPlayingRef.current = false;
       setProgress(0);
       setBuffered(0);
       setDuration(0);
@@ -227,25 +216,29 @@ export function PlayerProvider({ children }) {
 
   const togglePlay = useCallback(() => {
     if (!howlRef.current) return;
-    // Опираемся на UI-состояние, а не на мгновенный howl.playing(),
-    // чтобы первый клик после seek не терялся из-за буферизации.
-    if (playing) {
+    if (desiredPlayingRef.current) {
+      desiredPlayingRef.current = false;
       howlRef.current.pause();
       setPlaying(false);
     } else {
+      desiredPlayingRef.current = true;
       howlRef.current.play();
       setPlaying(true);
     }
-  }, [playing]);
+  }, []);
 
   const seek = useCallback((value) => {
     if (!howlRef.current) return;
     const next = Math.max(0, Number(value) || 0);
-    seekTargetRef.current = next;
-    pendingSeekRef.current = true;
-    // Мягко удерживаем UI на новой точке, пока движок подтверждает seek.
-    seekHoldUntilRef.current = Date.now() + 4000;
-    howlRef.current.seek(next);
+    const h = howlRef.current;
+    h.seek(next);
+    if (desiredPlayingRef.current) {
+      h.play();
+      setPlaying(true);
+    } else {
+      h.pause();
+      setPlaying(false);
+    }
     setProgress(next);
   }, []);
 
@@ -257,9 +250,7 @@ export function PlayerProvider({ children }) {
     }
     setCurrentTrack(null);
     setPlaying(false);
-    seekHoldUntilRef.current = 0;
-    seekTargetRef.current = 0;
-    pendingSeekRef.current = false;
+    desiredPlayingRef.current = false;
     setProgress(0);
     setBuffered(0);
     setDuration(0);
@@ -286,18 +277,7 @@ export function PlayerProvider({ children }) {
           setBuffered(Math.max(0, Math.min(total, end)));
         }
       }
-      const now = Date.now();
-      if (pendingSeekRef.current && now < seekHoldUntilRef.current && pos + 0.25 < seekTargetRef.current) {
-        setProgress(seekTargetRef.current);
-        return;
-      }
       setProgress(pos);
-      if (pos + 0.25 >= seekTargetRef.current) {
-        seekHoldUntilRef.current = 0;
-        pendingSeekRef.current = false;
-      } else if (pendingSeekRef.current && now >= seekHoldUntilRef.current) {
-        pendingSeekRef.current = false;
-      }
     };
     const id = setInterval(tick, 500);
     return () => clearInterval(id);
