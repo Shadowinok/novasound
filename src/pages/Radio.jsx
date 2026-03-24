@@ -11,24 +11,37 @@ export default function Radio() {
   const { loadTrack } = usePlayer();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [radio, setRadio] = useState({ now: null, next: [], queue: [] });
+  const [radio, setRadio] = useState({ now: null, next: [], history: [], queue: [], nowOffsetSec: 0 });
 
-  const loadRadio = useCallback(async () => {
+  const loadRadio = useCallback(async (opts = {}) => {
+    const resyncPlayback = Boolean(opts.resyncPlayback);
     setLoading(true);
     setError('');
     try {
       const { data } = await tracksApi.radioNow({ limit: 30 });
-      setRadio({
+      const nextRadio = {
         now: data?.now || null,
         next: Array.isArray(data?.next) ? data.next : [],
-        queue: Array.isArray(data?.queue) ? data.queue : []
-      });
+        history: Array.isArray(data?.history) ? data.history : [],
+        queue: Array.isArray(data?.queue) ? data.queue : [],
+        nowOffsetSec: Number(data?.nowOffsetSec) || 0
+      };
+      setRadio(nextRadio);
+
+      if (resyncPlayback && nextRadio.now && nextRadio.queue.length) {
+        loadTrack(nextRadio.now, {
+          queue: nextRadio.queue,
+          startIndex: 0,
+          isRadio: true,
+          startAtSec: nextRadio.nowOffsetSec
+        });
+      }
     } catch (e) {
       setError(e?.response?.data?.message || 'Не удалось загрузить эфир');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadTrack]);
 
   useEffect(() => {
     loadRadio();
@@ -43,7 +56,12 @@ export default function Radio() {
 
   const startRadio = () => {
     if (!radio.now || !radio.queue.length) return;
-    loadTrack(radio.now, { queue: radio.queue, startIndex: 0, isRadio: true });
+    loadTrack(radio.now, {
+      queue: radio.queue,
+      startIndex: 0,
+      isRadio: true,
+      startAtSec: radio.nowOffsetSec
+    });
   };
 
   return (
@@ -82,11 +100,27 @@ export default function Radio() {
           <button type="button" className="radio-btn" onClick={startRadio} disabled={!radio.now || loading}>
             Запустить эфир
           </button>
-          <button type="button" className="radio-btn radio-btn-ghost" onClick={loadRadio} disabled={loading}>
+          <button
+            type="button"
+            className="radio-btn radio-btn-ghost"
+            onClick={() => loadRadio({ resyncPlayback: true })}
+            disabled={loading}
+          >
             Обновить
           </button>
           <Link to="/playlists" className="radio-btn radio-btn-ghost">Плейлисты</Link>
         </div>
+
+        {!!radio.history?.length && (
+          <section className="radio-block">
+            <h2>История эфира</h2>
+            <ul>
+              {radio.history.map((t) => (
+                <li key={`h-${t._id}`}>{t.title} — {t.author?.username || 'Автор'}</li>
+              ))}
+            </ul>
+          </section>
+        )}
       </div>
 
       <style>{`
