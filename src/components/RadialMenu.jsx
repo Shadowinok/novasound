@@ -410,7 +410,7 @@ export default function RadialMenu({ user, isAdmin }) {
           border-radius: 50%;
           border: 2px solid var(--neon-cyan);
           background: rgba(5, 217, 232, 0.1);
-          color: var(--neon-cyan);
+          color: var(--neon-pink);
           font-family: var(--font-display);
           font-weight: 700;
           display: flex;
@@ -429,7 +429,7 @@ export default function RadialMenu({ user, isAdmin }) {
           height: 80px;
           font-size: 0.75rem;
         }
-        .radial-toggle .accent { color: var(--neon-pink); }
+        .radial-toggle .accent { color: var(--neon-cyan); }
 
         .radial-item {
           position: absolute;
