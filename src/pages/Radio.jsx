@@ -21,8 +21,9 @@ export default function Radio() {
     return `${mm}:${ss}`;
   };
 
-  const loadRadio = useCallback(async () => {
-    setLoading(true);
+  const loadRadio = useCallback(async (opts = {}) => {
+    const initial = Boolean(opts.initial);
+    if (initial || !radio.now) setLoading(true);
     setError('');
     try {
       const { data } = await tracksApi.radioNow({ limit: 30 });
@@ -37,12 +38,12 @@ export default function Radio() {
     } catch (e) {
       setError(e?.response?.data?.message || 'Не удалось загрузить эфир');
     } finally {
-      setLoading(false);
+      if (initial || !radio.now) setLoading(false);
     }
-  }, []);
+  }, [radio.now]);
 
   useEffect(() => {
-    loadRadio();
+    loadRadio({ initial: true });
   }, [loadRadio]);
 
   useEffect(() => {
@@ -52,14 +53,14 @@ export default function Radio() {
 
   useEffect(() => {
     const poll = setInterval(() => {
-      loadRadio();
+      loadRadio({ initial: false });
     }, 30000);
     return () => clearInterval(poll);
   }, [loadRadio]);
 
   const startRadio = () => {
     if (!radio.now || !radio.queue.length) return;
-    loadTrack(radio.now, { queue: radio.queue, startIndex: 0 });
+    loadTrack(radio.now, { queue: radio.queue, startIndex: 0, isRadio: true });
   };
 
   return (
@@ -74,12 +75,8 @@ export default function Radio() {
       <div className="radio-body">
         <section className="radio-block radio-now">
           <h2>Сейчас</h2>
-          {loading ? (
-            <p>Подбираем текущий эфир...</p>
-          ) : error ? (
-            <p>{error}</p>
-          ) : !radio.now ? (
-            <p>Пока нет одобренных треков для эфира.</p>
+          {!radio.now ? (
+            <p>Эфир оффлайн</p>
           ) : (
             <>
               <p>
