@@ -1,15 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="NovaSound NS">
   <rect width="64" height="64" rx="14" fill="#0a0a12"/>
 
-  <!-- S middle: behind N (short and compact) -->
-  <path d="M30 29L41 34L30 39" fill="none" stroke="#05d9e8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- S middle: behind N -->
+  <path d="M30 26C36 28 42 29 42 33C42 37 37 39 31 40" fill="none" stroke="#05d9e8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
 
   <!-- N -->
   <path d="M15 50V14L34 50V14" fill="none" stroke="#ff2a6d" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
 
   <!-- S top: visible in front -->
-  <path d="M45 18L34 18L27 24" fill="none" stroke="#05d9e8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M44 18C40 15 34 15 30 18C27 20 27 24 30 26" fill="none" stroke="#05d9e8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
 
   <!-- S bottom: visible in front -->
-  <path d="M27 44L34 50L45 50" fill="none" stroke="#05d9e8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M31 40C35 43 41 43 44 40" fill="none" stroke="#05d9e8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
