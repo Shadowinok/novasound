@@ -60,7 +60,7 @@ export function PlayerProvider({ children }) {
     return fallbackTrack ? [fallbackTrack] : [];
   }, []);
 
-  const playQueueTrack = useCallback((track, nextQueue, nextIndex) => {
+  const playQueueTrack = useCallback((track, nextQueue, nextIndex, opts = {}) => {
     releaseAudio();
     if (!track) {
       resetPlayerState();
@@ -76,9 +76,25 @@ export function PlayerProvider({ children }) {
     audio.crossOrigin = 'anonymous';
     audio.volume = volume;
 
+    const startAtSec = Number(opts.startAtSec);
+    let startApplied = false;
+    const applyStartOffset = () => {
+      if (startApplied) return;
+      if (!Number.isFinite(startAtSec) || startAtSec <= 0) return;
+      const d = Number(audio.duration);
+      const maxSeek = Number.isFinite(d) && d > 1 ? Math.max(0, d - 1) : startAtSec;
+      const target = Math.max(0, Math.min(startAtSec, maxSeek));
+      try {
+        audio.currentTime = target;
+        setProgress(target);
+        startApplied = true;
+      } catch (_) {}
+    };
+
     audio.addEventListener('loadedmetadata', () => {
       const d = Number(audio.duration);
       if (Number.isFinite(d) && d > 0) setDuration(d);
+      applyStartOffset();
     });
 
     audio.addEventListener('timeupdate', () => {
@@ -103,6 +119,7 @@ export function PlayerProvider({ children }) {
     audio.addEventListener('seeked', () => debugLog('seeked', { to: audio.currentTime }));
     audio.addEventListener('waiting', () => debugLog('waiting', { at: audio.currentTime }));
     audio.addEventListener('canplay', () => debugLog('canplay', { at: audio.currentTime }));
+    audio.addEventListener('canplay', applyStartOffset);
 
     audio.addEventListener('ended', () => {
       const mode = repeatModeRef.current;
@@ -168,7 +185,7 @@ export function PlayerProvider({ children }) {
     const q = normalizeQueue(options.queue, track);
     let idx = Number.isFinite(options.startIndex) ? Number(options.startIndex) : q.findIndex((t) => String(t?._id) === String(track._id));
     if (idx < 0) idx = 0;
-    playQueueTrack(q[idx] || track, q, idx);
+    playQueueTrack(q[idx] || track, q, idx, { startAtSec: options.startAtSec });
   }, [normalizeQueue, playQueueTrack]);
 
   const playNext = useCallback(() => {
