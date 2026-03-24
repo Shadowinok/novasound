@@ -11,49 +11,32 @@ export default function Radio() {
   const { loadTrack } = usePlayer();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [radio, setRadio] = useState({ now: null, next: [], history: [], queue: [], nowOffsetSec: 0, live: false });
-  const [liveNow, setLiveNow] = useState(new Date());
+  const [radio, setRadio] = useState({ now: null, next: [], queue: [] });
 
-  const formatTime = (sec) => {
-    const s = Math.max(0, Math.floor(Number(sec) || 0));
-    const mm = String(Math.floor(s / 60)).padStart(2, '0');
-    const ss = String(s % 60).padStart(2, '0');
-    return `${mm}:${ss}`;
-  };
-
-  const loadRadio = useCallback(async (opts = {}) => {
-    const initial = Boolean(opts.initial);
-    if (initial || !radio.now) setLoading(true);
+  const loadRadio = useCallback(async () => {
+    setLoading(true);
     setError('');
     try {
       const { data } = await tracksApi.radioNow({ limit: 30 });
       setRadio({
         now: data?.now || null,
         next: Array.isArray(data?.next) ? data.next : [],
-        history: Array.isArray(data?.history) ? data.history : [],
-        queue: Array.isArray(data?.queue) ? data.queue : [],
-        nowOffsetSec: Number(data?.nowOffsetSec) || 0,
-        live: Boolean(data?.live)
+        queue: Array.isArray(data?.queue) ? data.queue : []
       });
     } catch (e) {
       setError(e?.response?.data?.message || 'Не удалось загрузить эфир');
     } finally {
-      if (initial || !radio.now) setLoading(false);
+      setLoading(false);
     }
-  }, [radio.now]);
-
-  useEffect(() => {
-    loadRadio({ initial: true });
-  }, [loadRadio]);
-
-  useEffect(() => {
-    const timer = setInterval(() => setLiveNow(new Date()), 1000);
-    return () => clearInterval(timer);
   }, []);
 
   useEffect(() => {
+    loadRadio();
+  }, [loadRadio]);
+
+  useEffect(() => {
     const poll = setInterval(() => {
-      loadRadio({ initial: false });
+      loadRadio();
     }, 30000);
     return () => clearInterval(poll);
   }, [loadRadio]);
@@ -75,15 +58,14 @@ export default function Radio() {
       <div className="radio-body">
         <section className="radio-block radio-now">
           <h2>Сейчас</h2>
-          {!radio.now ? (
+          {error ? (
+            <p>{error}</p>
+          ) : !radio.now ? (
             <p>Эфир оффлайн</p>
           ) : (
             <>
               <p>
                 В эфире: <b>{radio.now.title}</b> — {radio.now.author?.username || 'Неизвестный автор'}
-              </p>
-              <p>
-                {radio.live ? 'LIVE' : 'OFFLINE'} · {liveNow.toLocaleTimeString('ru-RU')} · старт трека с {formatTime(radio.nowOffsetSec)}
               </p>
               {!!radio.next.length && (
                 <ul>
@@ -93,19 +75,6 @@ export default function Radio() {
                 </ul>
               )}
             </>
-          )}
-        </section>
-
-        <section className="radio-block">
-          <h2>История эфира</h2>
-          {!radio.history?.length ? (
-            <p>История пока пуста.</p>
-          ) : (
-            <ul>
-              {radio.history.map((t) => (
-                <li key={`h-${t._id}`}>{t.title} — {t.author?.username || 'Автор'}</li>
-              ))}
-            </ul>
           )}
         </section>
 
