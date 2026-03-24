@@ -37,28 +37,16 @@ export default function PlayerBar() {
     seekDraftRef.current = numeric;
   };
 
-  const finishSeekIfActive = () => {
+  const finishSeekIfActive = (withCommit = true) => {
     if (!seekActiveRef.current) return;
     seekActiveRef.current = false;
-    commitSeek(seekDraftRef.current);
+    if (withCommit) commitSeek(seekDraftRef.current);
     setIsSeeking(false);
   };
 
   useEffect(() => {
     seekDraftRef.current = seekDraft;
   }, [seekDraft]);
-
-  useEffect(() => {
-    const finishSeek = () => {
-      finishSeekIfActive();
-    };
-    window.addEventListener('pointerup', finishSeek, { passive: true });
-    window.addEventListener('pointercancel', finishSeek, { passive: true });
-    return () => {
-      window.removeEventListener('pointerup', finishSeek);
-      window.removeEventListener('pointercancel', finishSeek);
-    };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!volumeOpen) return;
@@ -139,7 +127,7 @@ export default function PlayerBar() {
           <button
             type="button"
             className="player-btn play-pause"
-            onPointerDown={() => finishSeekIfActive()}
+            onPointerDown={() => finishSeekIfActive(false)}
             onClick={togglePlay}
           >
             {playing ? '⏸' : '▶'}
@@ -191,6 +179,11 @@ export default function PlayerBar() {
             }}
             onPointerCancel={(e) => {
               e.stopPropagation();
+              seekActiveRef.current = false;
+              setIsSeeking(false);
+            }}
+            onLostPointerCapture={() => {
+              if (!seekActiveRef.current) return;
               seekActiveRef.current = false;
               commitSeek(seekDraftRef.current);
               setIsSeeking(false);
