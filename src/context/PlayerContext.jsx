@@ -23,6 +23,34 @@ export function PlayerProvider({ children }) {
   const queueIndexRef = useRef(0);
   const repeatModeRef = useRef('all');
   const desiredPlayingRef = useRef(false);
+  const playerDebugRef = useRef(localStorage.getItem('novasound_player_debug') === '1');
+
+  const debugLog = useCallback((event, payload = {}) => {
+    if (!playerDebugRef.current) return;
+    // eslint-disable-next-line no-console
+    console.debug(`[player] ${event}`, payload);
+  }, []);
+
+  const releaseAudio = useCallback(() => {
+    if (!audioRef.current) return;
+    audioRef.current.pause();
+    audioRef.current.src = '';
+    audioRef.current.load();
+    audioRef.current = null;
+  }, []);
+
+  const resetPlayerState = useCallback(() => {
+    setCurrentTrack(null);
+    setPlaying(false);
+    desiredPlayingRef.current = false;
+    setProgress(0);
+    setBuffered(0);
+    setDuration(0);
+    setQueue([]);
+    setQueueIndex(0);
+    queueRef.current = [];
+    queueIndexRef.current = 0;
+  }, []);
 
   const normalizeQueue = useCallback((list, fallbackTrack) => {
     const arr = Array.isArray(list) ? list.filter(Boolean) : [];
@@ -31,24 +59,16 @@ export function PlayerProvider({ children }) {
   }, []);
 
   const playQueueTrack = useCallback((track, nextQueue, nextIndex) => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.src = '';
-      audioRef.current.load();
-      audioRef.current = null;
-    }
+    releaseAudio();
     if (!track) {
-      setCurrentTrack(null);
-      setPlaying(false);
-      setProgress(0);
-      setBuffered(0);
-      setDuration(0);
+      resetPlayerState();
       return;
     }
     const token = localStorage.getItem('novasound_token');
     if (!token) return;
     const url = getAudioUrl(track);
     if (!url) return;
+    debugLog('load-track', { trackId: track._id, title: track.title });
     const audio = new Audio(url);
     audio.preload = 'auto';
     audio.crossOrigin = 'anonymous';
@@ -77,6 +97,10 @@ export function PlayerProvider({ children }) {
 
     audio.addEventListener('play', () => setPlaying(true));
     audio.addEventListener('pause', () => setPlaying(false));
+    audio.addEventListener('seeking', () => debugLog('seeking', { to: audio.currentTime }));
+    audio.addEventListener('seeked', () => debugLog('seeked', { to: audio.currentTime }));
+    audio.addEventListener('waiting', () => debugLog('waiting', { at: audio.currentTime }));
+    audio.addEventListener('canplay', () => debugLog('canplay', { at: audio.currentTime }));
 
     audio.addEventListener('ended', () => {
       const mode = repeatModeRef.current;
@@ -124,9 +148,10 @@ export function PlayerProvider({ children }) {
     audio.play().catch(() => {
       setPlaying(false);
       desiredPlayingRef.current = false;
+      debugLog('play-failed', { trackId: track._id });
     });
     tracksApi.play(track._id).catch(() => {});
-  }, [normalizeQueue, volume]);
+  }, [debugLog, normalizeQueue, releaseAudio, resetPlayerState, volume]);
 
   const loadTrack = useCallback((track, options = {}) => {
     if (!track) {
@@ -190,26 +215,12 @@ export function PlayerProvider({ children }) {
 
   useEffect(() => {
     const clearPlayer = () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.src = '';
-        audioRef.current.load();
-        audioRef.current = null;
-      }
-      setCurrentTrack(null);
-      setPlaying(false);
-      desiredPlayingRef.current = false;
-      setProgress(0);
-      setBuffered(0);
-      setDuration(0);
-      setQueue([]);
-      setQueueIndex(0);
-      queueRef.current = [];
-      queueIndexRef.current = 0;
+      releaseAudio();
+      resetPlayerState();
     };
     window.addEventListener('auth_logout', clearPlayer);
     return () => window.removeEventListener('auth_logout', clearPlayer);
-  }, []);
+  }, [releaseAudio, resetPlayerState]);
 
   useEffect(() => {
     const onCover = (e) => {
@@ -236,21 +247,27 @@ export function PlayerProvider({ children }) {
       desiredPlayingRef.current = false;
       audioRef.current.pause();
       setPlaying(false);
+      debugLog('pause');
     } else {
       desiredPlayingRef.current = true;
       audioRef.current.play()
-        .then(() => setPlaying(true))
+        .then(() => {
+          setPlaying(true);
+          debugLog('play');
+        })
         .catch(() => {
           desiredPlayingRef.current = false;
           setPlaying(false);
+          debugLog('play-failed');
         });
     }
-  }, []);
+  }, [debugLog]);
 
   const seek = useCallback((value) => {
     if (!audioRef.current) return;
     const next = Math.max(0, Number(value) || 0);
     audioRef.current.currentTime = next;
+    debugLog('seek', { to: next });
     if (desiredPlayingRef.current) {
       audioRef.current.play().catch(() => {});
       setPlaying(true);
@@ -259,36 +276,17 @@ export function PlayerProvider({ children }) {
       setPlaying(false);
     }
     setProgress(next);
-  }, []);
+  }, [debugLog]);
 
   /** Остановить и убрать плеер с экрана */
   const closePlayer = useCallback(() => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.src = '';
-      audioRef.current.load();
-      audioRef.current = null;
-    }
-    setCurrentTrack(null);
-    setPlaying(false);
-    desiredPlayingRef.current = false;
-    setProgress(0);
-    setBuffered(0);
-    setDuration(0);
-      setQueue([]);
-      setQueueIndex(0);
-      queueRef.current = [];
-      queueIndexRef.current = 0;
-  }, []);
+    releaseAudio();
+    resetPlayerState();
+  }, [releaseAudio, resetPlayerState]);
 
   useEffect(() => () => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.src = '';
-      audioRef.current.load();
-      audioRef.current = null;
-    }
-  }, []);
+    releaseAudio();
+  }, [releaseAudio]);
 
   return (
     <PlayerContext.Provider value={{
