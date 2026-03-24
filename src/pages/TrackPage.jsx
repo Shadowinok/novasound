@@ -5,6 +5,7 @@ import client from '../api/client';
 import { usePlayer } from '../context/PlayerContext';
 import { useAuth } from '../context/AuthContext';
 import { playlists as playlistsApi } from '../api/client';
+import { getTrackStatusMeta } from '../utils/moderationStatus';
 
 export default function TrackPage() {
   const { id } = useParams();
@@ -128,6 +129,7 @@ export default function TrackPage() {
   }
 
   const isCurrent = currentTrack?._id === track._id;
+  const statusMeta = getTrackStatusMeta(track);
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="page track-page">
@@ -161,7 +163,7 @@ export default function TrackPage() {
           </div>
           {track.description && <p className="track-detail-desc">{track.description}</p>}
           {track.status && track.status !== 'approved' && (
-            <p className="track-status-note">Статус: {track.status}</p>
+            <p className="track-status-note" title={statusMeta.hint}>Статус: {statusMeta.label}</p>
           )}
         </div>
       </div>

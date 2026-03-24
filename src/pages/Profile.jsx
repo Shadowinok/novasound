@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import TrackCard from '../components/TrackCard';
 import UploadTrack from '../components/UploadTrack';
 import { coverImageBackgroundStyle } from '../utils/coverImage';
+import { getTrackStatusMeta } from '../utils/moderationStatus';
 
 /** Обложка карточки: `playlist.coverImage` → иначе обложка первого трека → градиент (как на главной). */
 function playlistCardCoverStyle(p) {
@@ -411,9 +412,9 @@ export default function Profile() {
         <div className="stat-card">
           <div className="stat-label">Статусы</div>
           <div className="stat-meta">
-            <span>pending: {stats.byStatus.pending || 0}</span>
-            <span>approved: {stats.byStatus.approved || 0}</span>
-            <span>rejected: {stats.byStatus.rejected || 0}</span>
+            <span>На модерации: {stats.byStatus.pending || 0}</span>
+            <span>Опубликованы: {stats.byStatus.approved || 0}</span>
+            <span>Отклонены: {stats.byStatus.rejected || 0}</span>
           </div>
         </div>
       </div>
@@ -515,6 +516,9 @@ export default function Profile() {
                 coverDisplayUrl={t.coverChangeStatus === 'pending' && t.coverImagePending ? t.coverImagePending : undefined}
                 showPendingCoverBadge={t.coverChangeStatus === 'pending' && !!t.coverImagePending}
               />
+              {t.status && t.status !== 'approved' && (
+                <div className="my-track-status-hint">{getTrackStatusMeta(t).hint}</div>
+              )}
               <div className="my-track-actions">
                 {(t.status === 'approved' || t.status === 'pending') && (
                   <button
@@ -744,6 +748,12 @@ export default function Profile() {
           gap: 20px;
         }
         .my-track { display: flex; flex-direction: column; gap: 10px; }
+        .my-track-status-hint {
+          color: #ffc800;
+          font-size: 0.82rem;
+          line-height: 1.35;
+          margin-top: -4px;
+        }
         .my-track-actions { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; align-items: center; }
         .my-track-cover {
           padding: 8px 14px;
