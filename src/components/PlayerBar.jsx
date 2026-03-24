@@ -26,6 +26,7 @@ export default function PlayerBar() {
   const [seekDraft, setSeekDraft] = useState(0);
   const volumeWrapRef = useRef(null);
   const seekDraftRef = useRef(0);
+  const seekActiveRef = useRef(false);
 
   const commitSeek = (value) => {
     if (!(duration > 0)) return;
@@ -39,6 +40,21 @@ export default function PlayerBar() {
   useEffect(() => {
     seekDraftRef.current = seekDraft;
   }, [seekDraft]);
+
+  useEffect(() => {
+    const finishSeek = () => {
+      if (!seekActiveRef.current) return;
+      seekActiveRef.current = false;
+      commitSeek(seekDraftRef.current);
+      setIsSeeking(false);
+    };
+    window.addEventListener('pointerup', finishSeek, { passive: true });
+    window.addEventListener('pointercancel', finishSeek, { passive: true });
+    return () => {
+      window.removeEventListener('pointerup', finishSeek);
+      window.removeEventListener('pointercancel', finishSeek);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!volumeOpen) return;
@@ -145,6 +161,7 @@ export default function PlayerBar() {
             }}
             onPointerDown={(e) => {
               e.stopPropagation();
+              seekActiveRef.current = true;
               setIsSeeking(true);
               const v = Number(e.currentTarget.value);
               const next = Number.isFinite(v) ? v : sliderValue;
@@ -156,6 +173,7 @@ export default function PlayerBar() {
             }}
             onPointerUp={(e) => {
               e.stopPropagation();
+              seekActiveRef.current = false;
               commitSeek(e.currentTarget.value);
               setIsSeeking(false);
               if (e.currentTarget.releasePointerCapture) {
@@ -164,11 +182,13 @@ export default function PlayerBar() {
             }}
             onPointerCancel={(e) => {
               e.stopPropagation();
+              seekActiveRef.current = false;
               commitSeek(seekDraftRef.current);
               setIsSeeking(false);
             }}
             onBlur={() => {
               if (!isSeeking) return;
+              seekActiveRef.current = false;
               commitSeek(seekDraftRef.current);
               setIsSeeking(false);
             }}
