@@ -1,11 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="NovaSound">
-  <defs>
-    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#d300c5"/>
-      <stop offset="50%" style="stop-color:#05d9e8"/>
-      <stop offset="100%" style="stop-color:#ff2a6d"/>
-    </linearGradient>
-  </defs>
-  <rect width="32" height="32" rx="8" fill="#0a0a12"/>
-  <path fill="url(#g)" d="M22 8v14.5c0 2.2-1.8 4-4 4s-4-1.8-4-4 1.8-4 4-4c.7 0 1.4.2 2 .5V12l-8 2.5v9c0 2.2-1.8 4-4 4s-4-1.8-4-4 1.8-4 4-4c.7 0 1.4.2 2 .5V7l10-3v4z"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="NovaSound NS">
+  <rect width="64" height="64" rx="14" fill="#0a0a12"/>
+  <path d="M12 50V14L31 50V14" fill="none" stroke="#ff2a6d" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M52 19c-3-4-7-6-13-6-6 0-11 3-11 8 0 14 26 4 26 19 0 7-7 12-16 12-6 0-11-2-15-7" fill="none" stroke="#05d9e8" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
