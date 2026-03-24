@@ -1,15 +1,43 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="NovaSound NS">
-  <rect width="64" height="64" rx="14" fill="#0a0a12"/>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#12142a"/>
+      <stop offset="100%" stop-color="#080911"/>
+    </linearGradient>
+    <linearGradient id="nFill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f03cff"/>
+      <stop offset="55%" stop-color="#d300c5"/>
+      <stop offset="100%" stop-color="#8b0086"/>
+    </linearGradient>
+    <linearGradient id="sFill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#9af8ff"/>
+      <stop offset="55%" stop-color="#05d9e8"/>
+      <stop offset="100%" stop-color="#0397a3"/>
+    </linearGradient>
+    <filter id="nGlow" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="0" stdDeviation="1.6" flood-color="#d300c5" flood-opacity="0.85"/>
+      <feDropShadow dx="0" dy="0" stdDeviation="0.5" flood-color="#ffb8ff" flood-opacity="0.6"/>
+    </filter>
+    <filter id="sGlow" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="0" stdDeviation="1.6" flood-color="#05d9e8" flood-opacity="0.85"/>
+      <feDropShadow dx="0" dy="0" stdDeviation="0.5" flood-color="#d8fdff" flood-opacity="0.7"/>
+    </filter>
+  </defs>
 
-  <!-- S middle: behind N -->
-  <path d="M31 31C36 33 38 34 38 36C38 38 36 39 32 40" fill="none" stroke="#05d9e8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
+  <rect x="1.25" y="1.25" width="61.5" height="61.5" rx="12.3" fill="none" stroke="rgba(255,255,255,0.08)"/>
 
-  <!-- N -->
-  <path d="M14 50V14L32 50V14" fill="none" stroke="#ff2a6d" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- N depth layer -->
+  <text x="2.8" y="57.4" font-family="Arial Black, Arial, sans-serif" font-size="66" fill="#5d004f" opacity="0.9">N</text>
+  <!-- N main -->
+  <text x="1.6" y="56.2" font-family="Arial Black, Arial, sans-serif" font-size="66" fill="url(#nFill)" filter="url(#nGlow)">N</text>
+  <!-- N edge highlight -->
+  <text x="1.6" y="56.2" font-family="Arial Black, Arial, sans-serif" font-size="66" fill="none" stroke="#ffc7ff" stroke-width="0.85" opacity="0.4">N</text>
 
-  <!-- S top: visible in front -->
-  <path d="M48 18C45 15 41 14 36 14C31 14 28 17 28 21C28 25 31 28 36 30" fill="none" stroke="#05d9e8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
-
-  <!-- S bottom: visible in front (curl to left) -->
-  <path d="M32 40C37 42 38 46 36 50C34 53 30 54 25 54C21 54 18 53 15 50" fill="none" stroke="#05d9e8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- S depth layer -->
+  <text x="19.2" y="54.4" font-family="Arial Black, Arial, sans-serif" font-size="60" fill="#01616a" opacity="0.9">S</text>
+  <!-- S main -->
+  <text x="18" y="53.2" font-family="Arial Black, Arial, sans-serif" font-size="60" fill="url(#sFill)" filter="url(#sGlow)">S</text>
+  <!-- S edge highlight -->
+  <text x="18" y="53.2" font-family="Arial Black, Arial, sans-serif" font-size="60" fill="none" stroke="#dfffff" stroke-width="0.75" opacity="0.45">S</text>
 </svg>
