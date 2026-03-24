@@ -157,10 +157,10 @@ export function PlayerProvider({ children }) {
     const q = queueRef.current;
     const idx = queueIndexRef.current;
     if (!q.length) return;
-    const h = howlRef.current;
-    const pos = h ? Number(h.seek()) : 0;
+    const a = audioRef.current;
+    const pos = a ? Number(a.currentTime) : 0;
     if (pos > 3) {
-      if (h) h.seek(0);
+      if (a) a.currentTime = 0;
       setProgress(0);
       return;
     }
