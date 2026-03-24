@@ -2,14 +2,14 @@
   <rect width="64" height="64" rx="14" fill="#0a0a12"/>
 
   <!-- S middle: behind N -->
-  <path d="M32 29C36 31 40 32 40 34C40 36 36 37 32 39" fill="none" stroke="#05d9e8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M34 30C39 32 40 35 38 38C36 40 33 40 30 40" fill="none" stroke="#05d9e8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
 
   <!-- N -->
   <path d="M14 50V14L32 50V14" fill="none" stroke="#ff2a6d" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
 
   <!-- S top: visible in front -->
-  <path d="M50 18C47 15 43 14 39 14C34 14 30 17 30 21C30 24 33 27 37 28" fill="none" stroke="#05d9e8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M48 18C45 15 40 14 36 14C31 14 28 17 28 21C28 25 31 27 36 29" fill="none" stroke="#05d9e8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
 
   <!-- S bottom: visible in front -->
-  <path d="M37 40C33 41 30 44 30 47C30 51 34 54 39 54C43 54 47 53 50 50" fill="none" stroke="#05d9e8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M30 40C26 42 25 46 27 49C29 52 33 54 38 54C42 54 46 53 49 50" fill="none" stroke="#05d9e8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
