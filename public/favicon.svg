@@ -2,14 +2,14 @@
   <rect width="64" height="64" rx="14" fill="#0a0a12"/>
 
   <!-- S middle: behind N -->
-  <path d="M30 26C36 28 42 29 42 33C42 37 37 39 31 40" fill="none" stroke="#05d9e8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M32 29C36 31 40 32 40 34C40 36 36 37 32 39" fill="none" stroke="#05d9e8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
 
   <!-- N -->
-  <path d="M15 50V14L34 50V14" fill="none" stroke="#ff2a6d" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M14 50V14L32 50V14" fill="none" stroke="#ff2a6d" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
 
   <!-- S top: visible in front -->
-  <path d="M44 18C40 15 34 15 30 18C27 20 27 24 30 26" fill="none" stroke="#05d9e8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M50 18C47 15 43 14 39 14C34 14 30 17 30 21C30 24 33 27 37 28" fill="none" stroke="#05d9e8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
 
   <!-- S bottom: visible in front -->
-  <path d="M31 40C35 43 41 43 44 40" fill="none" stroke="#05d9e8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M37 40C33 41 30 44 30 47C30 51 34 54 39 54C43 54 47 53 50 50" fill="none" stroke="#05d9e8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
