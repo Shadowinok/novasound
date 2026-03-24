@@ -163,7 +163,7 @@ export function PlayerProvider({ children }) {
     const radioMode = Boolean(options.isRadio);
     setIsRadioMode(radioMode);
     if (radioMode) {
-      setRepeatMode('all-repeat');
+      setRepeatMode('all');
     }
     const q = normalizeQueue(options.queue, track);
     let idx = Number.isFinite(options.startIndex) ? Number(options.startIndex) : q.findIndex((t) => String(t?._id) === String(track._id));
