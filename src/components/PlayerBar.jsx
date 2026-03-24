@@ -15,6 +15,7 @@ export default function PlayerBar() {
     queue,
     queueIndex,
     repeatMode,
+    isRadioMode,
     togglePlay,
     playNext,
     playPrev,
@@ -159,15 +160,17 @@ export default function PlayerBar() {
               {volumeIcon}
             </span>
           </button>
-          <button
-            type="button"
-            className={`player-btn repeat-btn mode-${repeatMode}`}
-            onClick={cycleRepeatMode}
-            aria-label="Режим повтора"
-            title="Режим повтора"
-          >
-            {repeatLabel}
-          </button>
+          {!isRadioMode && (
+            <button
+              type="button"
+              className={`player-btn repeat-btn mode-${repeatMode}`}
+              onClick={cycleRepeatMode}
+              aria-label="Режим повтора"
+              title="Режим повтора"
+            >
+              {repeatLabel}
+            </button>
+          )}
           <button
             type="button"
             className="player-close"
