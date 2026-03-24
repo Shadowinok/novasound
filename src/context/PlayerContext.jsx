@@ -1,13 +1,5 @@
 import React, { createContext, useContext, useState, useRef, useCallback, useEffect } from 'react';
-import { Howl, Howler } from 'howler';
 import { tracks as tracksApi, getAudioUrl } from '../api/client';
-
-/**
- * По умолчанию Howler вешает на document первый click/touch и для «разблокировки»
- * вызывает .load() на HTML5 Audio — это сбрасывает уже играющий трек после первого клика мышью.
- * Воспроизведение и так запускается по клику «Play» (валидный user gesture).
- */
-Howler.autoUnlock = false;
 
 const PlayerContext = createContext(null);
 
@@ -26,7 +18,7 @@ export function PlayerProvider({ children }) {
     if (Number.isFinite(saved) && saved >= 0 && saved <= 1) return saved;
     return 1;
   });
-  const howlRef = useRef(null);
+  const audioRef = useRef(null);
   const queueRef = useRef([]);
   const queueIndexRef = useRef(0);
   const repeatModeRef = useRef('all');
@@ -39,9 +31,11 @@ export function PlayerProvider({ children }) {
   }, []);
 
   const playQueueTrack = useCallback((track, nextQueue, nextIndex) => {
-    if (howlRef.current) {
-      howlRef.current.unload();
-      howlRef.current = null;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = '';
+      audioRef.current.load();
+      audioRef.current = null;
     }
     if (!track) {
       setCurrentTrack(null);
@@ -55,49 +49,66 @@ export function PlayerProvider({ children }) {
     if (!token) return;
     const url = getAudioUrl(track);
     if (!url) return;
-    const howl = new Howl({
-      src: [url],
-      html5: true,
-      format: ['mp3', 'ogg', 'm4a', 'wav'],
-      volume,
-      onload: () => setDuration(howl.duration()),
-      onend: () => {
-        const mode = repeatModeRef.current;
-        const q = queueRef.current;
-        const idx = queueIndexRef.current;
-        if (mode === 'one-repeat') {
-          howl.seek(0);
-          howl.play();
-          return;
+    const audio = new Audio(url);
+    audio.preload = 'auto';
+    audio.crossOrigin = 'anonymous';
+    audio.volume = volume;
+
+    audio.addEventListener('loadedmetadata', () => {
+      const d = Number(audio.duration);
+      if (Number.isFinite(d) && d > 0) setDuration(d);
+    });
+
+    audio.addEventListener('timeupdate', () => {
+      const p = Number(audio.currentTime);
+      if (Number.isFinite(p)) setProgress(p);
+    });
+
+    audio.addEventListener('progress', () => {
+      const d = Number(audio.duration);
+      if (!Number.isFinite(d) || d <= 0) return;
+      try {
+        if (audio.buffered.length > 0) {
+          const end = Number(audio.buffered.end(audio.buffered.length - 1));
+          if (Number.isFinite(end)) setBuffered(Math.max(0, Math.min(d, end)));
         }
-        if (mode === 'one') {
-          setPlaying(false);
-          setProgress(0);
-          return;
-        }
-        const nextIdx = idx + 1;
-        if (nextIdx < q.length) {
-          const nextTrack = q[nextIdx];
-          if (nextTrack) {
-            playQueueTrack(nextTrack, q, nextIdx);
-            return;
-          }
-        }
-        if (mode === 'all-repeat' && q.length > 0) {
-          playQueueTrack(q[0], q, 0);
-          return;
-        }
+      } catch (_) {}
+    });
+
+    audio.addEventListener('play', () => setPlaying(true));
+    audio.addEventListener('pause', () => setPlaying(false));
+
+    audio.addEventListener('ended', () => {
+      const mode = repeatModeRef.current;
+      const q = queueRef.current;
+      const idx = queueIndexRef.current;
+      if (mode === 'one-repeat') {
+        audio.currentTime = 0;
+        audio.play().catch(() => {});
+        return;
+      }
+      if (mode === 'one') {
         setPlaying(false);
         setProgress(0);
-      },
-      onplay: () => setPlaying(true),
-      onpause: () => setPlaying(false),
-      onseek: () => {
-        const p = Number(howl.seek());
-        if (Number.isFinite(p)) setProgress(p);
+        return;
       }
+      const nextIdx = idx + 1;
+      if (nextIdx < q.length) {
+        const nextTrack = q[nextIdx];
+        if (nextTrack) {
+          playQueueTrack(nextTrack, q, nextIdx);
+          return;
+        }
+      }
+      if (mode === 'all-repeat' && q.length > 0) {
+        playQueueTrack(q[0], q, 0);
+        return;
+      }
+      setPlaying(false);
+      setProgress(0);
     });
-    howlRef.current = howl;
+
+    audioRef.current = audio;
     const safeQueue = normalizeQueue(nextQueue, track);
     const safeIndex = Math.max(0, Math.min(nextIndex, safeQueue.length - 1));
     queueRef.current = safeQueue;
@@ -110,7 +121,10 @@ export function PlayerProvider({ children }) {
     setBuffered(0);
     setDuration(track.duration || 0);
     setPlaying(true);
-    howl.play();
+    audio.play().catch(() => {
+      setPlaying(false);
+      desiredPlayingRef.current = false;
+    });
     tracksApi.play(track._id).catch(() => {});
   }, [normalizeQueue, volume]);
 
@@ -176,9 +190,11 @@ export function PlayerProvider({ children }) {
 
   useEffect(() => {
     const clearPlayer = () => {
-      if (howlRef.current) {
-        howlRef.current.unload();
-        howlRef.current = null;
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = '';
+        audioRef.current.load();
+        audioRef.current = null;
       }
       setCurrentTrack(null);
       setPlaying(false);
@@ -211,32 +227,35 @@ export function PlayerProvider({ children }) {
     const v = Math.max(0, Math.min(1, Number(nextVolume) || 0));
     setVolume(v);
     localStorage.setItem('novasound_volume', String(v));
-    if (howlRef.current) howlRef.current.volume(v);
+    if (audioRef.current) audioRef.current.volume = v;
   }, []);
 
   const togglePlay = useCallback(() => {
-    if (!howlRef.current) return;
+    if (!audioRef.current) return;
     if (desiredPlayingRef.current) {
       desiredPlayingRef.current = false;
-      howlRef.current.pause();
+      audioRef.current.pause();
       setPlaying(false);
     } else {
       desiredPlayingRef.current = true;
-      howlRef.current.play();
-      setPlaying(true);
+      audioRef.current.play()
+        .then(() => setPlaying(true))
+        .catch(() => {
+          desiredPlayingRef.current = false;
+          setPlaying(false);
+        });
     }
   }, []);
 
   const seek = useCallback((value) => {
-    if (!howlRef.current) return;
+    if (!audioRef.current) return;
     const next = Math.max(0, Number(value) || 0);
-    const h = howlRef.current;
-    h.seek(next);
+    audioRef.current.currentTime = next;
     if (desiredPlayingRef.current) {
-      h.play();
+      audioRef.current.play().catch(() => {});
       setPlaying(true);
     } else {
-      h.pause();
+      audioRef.current.pause();
       setPlaying(false);
     }
     setProgress(next);
@@ -244,9 +263,11 @@ export function PlayerProvider({ children }) {
 
   /** Остановить и убрать плеер с экрана */
   const closePlayer = useCallback(() => {
-    if (howlRef.current) {
-      howlRef.current.unload();
-      howlRef.current = null;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = '';
+      audioRef.current.load();
+      audioRef.current = null;
     }
     setCurrentTrack(null);
     setPlaying(false);
@@ -260,28 +281,14 @@ export function PlayerProvider({ children }) {
       queueIndexRef.current = 0;
   }, []);
 
-  // Только currentTrack — иначе при паузе/плей эффект пересоздаётся и на части браузеров глючит HTML5 Audio
-  useEffect(() => {
-    const howl = howlRef.current;
-    if (!howl) return;
-    const tick = () => {
-      const h = howlRef.current;
-      if (!h) return;
-      const pos = h.seek();
-      if (typeof pos !== 'number' || Number.isNaN(pos)) return;
-      const total = Math.max(Number(h.duration()) || 0, 0);
-      const node = h._sounds?.[0]?._node;
-      if (node && total > 0 && node.buffered && typeof node.buffered.length === 'number' && node.buffered.length > 0) {
-        const end = Number(node.buffered.end(node.buffered.length - 1));
-        if (Number.isFinite(end)) {
-          setBuffered(Math.max(0, Math.min(total, end)));
-        }
-      }
-      setProgress(pos);
-    };
-    const id = setInterval(tick, 500);
-    return () => clearInterval(id);
-  }, [currentTrack]);
+  useEffect(() => () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = '';
+      audioRef.current.load();
+      audioRef.current = null;
+    }
+  }, []);
 
   return (
     <PlayerContext.Provider value={{
