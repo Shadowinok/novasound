@@ -7,6 +7,7 @@ import { usePlayer } from '../context/PlayerContext';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import client, { playlists as playlistsApi } from '../api/client';
+import { getTrackStatusMeta } from '../utils/moderationStatus';
 
 export default function TrackCard({
   track,
@@ -33,6 +34,7 @@ export default function TrackCard({
   const [newPlaylistTitle, setNewPlaylistTitle] = useState('');
 
   const coverRaw = coverDisplayUrl || track.coverImage;
+  const statusMeta = getTrackStatusMeta(track);
   const coverBust = track.updatedAt ? new Date(track.updatedAt).getTime() : (coverRaw ? String(coverRaw).slice(-24) : '');
   const coverBgStyle =
     coverRaw
@@ -159,7 +161,7 @@ export default function TrackCard({
             {likesCount ? ` · ♥ ${likesCount}` : ''}
           </div>
           {showStatus && track.status && (
-            <span className={`track-status status-${track.status}`}>{track.status}</span>
+            <span className={`track-status status-${track.status}`} title={statusMeta.hint}>{statusMeta.label}</span>
           )}
         </div>
       </Link>
