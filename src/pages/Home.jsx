@@ -58,6 +58,14 @@ export default function Home() {
           const msg = a.message ? ` — ${String(a.message).trim()}` : '';
           return { kind: 'announcement', text: `Анонс: ${a.title}${msg}` };
         }
+        if (a.kind === 'weather') {
+          const tempText = Number.isFinite(Number(a.temperatureC)) ? `${a.temperatureC}°C` : 'н/д';
+          const windText = Number.isFinite(Number(a.windSpeed)) ? `, ветер ${a.windSpeed} м/с` : '';
+          return { kind: 'weather', text: `Погода: ${a.city} ${tempText}${windText}` };
+        }
+        if (a.kind === 'ai-news') {
+          return { kind: 'ai-news', text: `ИИ: ${a.title}` };
+        }
         if (a.kind === 'new-track') return { kind: 'new-track', text: `Новинка: ${a.title}` };
         return null;
       })
@@ -258,6 +266,8 @@ export default function Home() {
         .news-ticker-item--radio { color: var(--neon-pink); }
         .news-ticker-item--radio-offline { color: #ff6b6b; text-shadow: 0 0 18px rgba(255, 50, 50, 0.18); }
         .news-ticker-item--announcement { color: #ffd65a; text-shadow: 0 0 18px rgba(255, 200, 0, 0.14); }
+        .news-ticker-item--ai-news { color: #c6b6ff; text-shadow: 0 0 18px rgba(160, 120, 255, 0.16); }
+        .news-ticker-item--weather { color: #9ee7ff; text-shadow: 0 0 18px rgba(70, 190, 255, 0.16); }
         .news-ticker-item--new-track { color: var(--neon-cyan); }
         .news-ticker-sep {
           color: rgba(165, 235, 248, 0.55);
