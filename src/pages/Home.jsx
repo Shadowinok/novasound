@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import client from '../api/client';
@@ -13,11 +13,22 @@ export default function Home() {
   const [announcements, setAnnouncements] = useState([]);
 
   useEffect(() => {
+    let alive = true;
+    const loadAnnouncements = () =>
+      client
+        .get('/announcements', { params: { limit: 10 } })
+        .then((r) => {
+          if (!alive) return;
+          setAnnouncements(Array.isArray(r.data?.items) ? r.data.items : []);
+        })
+        .catch(() => {});
+
     client.get('/tracks', { params: { limit: 8, sort: '-createdAt' } }).then(r => setLatest(r.data.tracks || [])).catch(() => {});
     charts.weekly().then(r => setPopular((r.data || []).slice(0, 6))).catch(() => {});
-    client.get('/announcements', { params: { limit: 7 } })
-      .then((r) => setAnnouncements(Array.isArray(r.data?.items) ? r.data.items : []))
-      .catch(() => {});
+
+    loadAnnouncements();
+    const t = window.setInterval(loadAnnouncements, 20000);
+
     playlists
       .featured(6)
       .then((r) => {
@@ -31,7 +42,47 @@ export default function Home() {
       .catch(() => {
         playlists.list().then((rr) => setPlaylistList((rr.data || []).slice(0, 6))).catch(() => {});
       });
+    return () => {
+      alive = false;
+      window.clearInterval(t);
+    };
   }, []);
+
+  const tickerSegments = useMemo(() => {
+    const items = Array.isArray(announcements) ? announcements : [];
+    const segments = items
+      .map((a) => {
+        if (a.kind === 'radio') return { kind: 'radio', text: `В эфире: ${a.title}` };
+        if (a.kind === 'radio-offline') return { kind: 'radio-offline', text: 'Эфир оффлайн' };
+        if (a.kind === 'announcement') {
+          const msg = a.message ? ` — ${String(a.message).trim()}` : '';
+          return { kind: 'announcement', text: `Анонс: ${a.title}${msg}` };
+        }
+        if (a.kind === 'new-track') return { kind: 'new-track', text: `Новинка: ${a.title}` };
+        return null;
+      })
+      .filter(Boolean);
+    // Слегка укоротим сообщения, чтобы лента не раздувалась.
+    return segments.map((s) => ({ ...s, text: String(s.text).slice(0, 140) }));
+  }, [announcements]);
+
+  const renderTickerSequence = (loopIdx) => {
+    const seq = [];
+    tickerSegments.forEach((s, i) => {
+      if (i > 0) {
+        seq.push(<span key={`sep-${loopIdx}-${i}`} className="news-ticker-sep"> • </span>);
+      }
+      seq.push(
+        <span
+          key={`seg-${loopIdx}-${i}`}
+          className={`news-ticker-item news-ticker-item--${s.kind}`}
+        >
+          {s.text}
+        </span>
+      );
+    });
+    return seq;
+  };
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="page home">
@@ -42,36 +93,13 @@ export default function Home() {
           <span className="hero-sub-line">слушай, загружай, смотри чарты</span>
         </div>
       </section>
-      {announcements.length > 0 && (
-        <section className="announcements-section">
-          <h3 className="section-title">Анонсы</h3>
-          <div className="announcements-list">
-            {announcements.map((a) => (
-              a.trackId ? (
-                <Link
-                  key={`${a.kind}-${a.announcementId || a._id || a.trackId || ''}`}
-                  to={`/track/${a.trackId}`}
-                  className={`announcement-item ${a.kind === 'radio' ? 'announcement-item--radio' : ''}`}
-                >
-                  <span className="announcement-kind">
-                    {a.kind === 'radio' ? 'В эфире' : a.kind === 'announcement' ? 'Анонс' : 'Новинка'}
-                  </span>
-                  <span className="announcement-title">{a.title}</span>
-                  {!!a.message && <span className="announcement-message">{String(a.message).slice(0, 120)}</span>}
-                </Link>
-              ) : (
-                <div
-                  key={`${a.kind}-${a.announcementId || a._id || ''}`}
-                  className={`announcement-item ${a.kind === 'radio' ? 'announcement-item--radio' : ''}`}
-                >
-                  <span className="announcement-kind">
-                    {a.kind === 'radio' ? 'В эфире' : a.kind === 'announcement' ? 'Анонс' : 'Новинка'}
-                  </span>
-                  <span className="announcement-title">{a.title}</span>
-                  {!!a.message && <span className="announcement-message">{String(a.message).slice(0, 120)}</span>}
-                </div>
-              )
-            ))}
+      {tickerSegments.length > 0 && (
+        <section className="news-ticker-section" aria-label="Новостная лента">
+          <div className="news-ticker">
+            <div className="news-ticker-track" aria-hidden="true">
+              {renderTickerSequence(0)}
+              {renderTickerSequence(1)}
+            </div>
           </div>
         </section>
       )}
@@ -202,41 +230,46 @@ export default function Home() {
           box-shadow: var(--glow-cyan);
         }
 
-        .announcements-section { margin-top: 18px; }
-        .announcements-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
-        .announcement-item {
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-          padding: 12px;
-          border-radius: 12px;
+        .news-ticker-section { margin-top: 18px; }
+        .news-ticker {
           border: 1px solid rgba(5, 217, 232, 0.28);
           background: rgba(255, 255, 255, 0.02);
-          text-decoration: none;
-          transition: box-shadow 0.2s, border-color 0.2s, transform 0.2s;
+          border-radius: 12px;
+          overflow: hidden;
         }
-        .announcement-item:hover {
-          box-shadow: 0 0 25px rgba(5, 217, 232, 0.18);
-          border-color: rgba(5, 217, 232, 0.55);
-          transform: translateY(-1px);
+        .news-ticker-track {
+          display: flex;
+          align-items: center;
+          white-space: nowrap;
+          width: max-content;
+          padding: 10px 0;
+          gap: 0;
+          animation: news-ticker-marquee 28s linear infinite;
+          will-change: transform;
         }
-        .announcement-item--radio {
-          border-color: rgba(211, 0, 197, 0.35);
-          box-shadow: 0 0 22px rgba(211, 0, 197, 0.12);
-        }
-        .announcement-kind {
-          font-size: 0.75rem;
-          color: var(--text-dim);
-        }
-        .announcement-title {
+        .news-ticker:hover .news-ticker-track { animation-play-state: paused; }
+        .news-ticker-item {
           font-family: var(--font-display);
+          font-size: 0.98rem;
+          padding: 0 14px;
           color: var(--neon-cyan);
-          font-size: 0.95rem;
+          text-shadow: 0 0 18px rgba(5, 217, 232, 0.16);
         }
-        .announcement-message {
-          font-size: 0.82rem;
-          color: var(--text-dim);
-          margin-top: 2px;
+        .news-ticker-item--radio { color: var(--neon-pink); }
+        .news-ticker-item--radio-offline { color: #ff6b6b; text-shadow: 0 0 18px rgba(255, 50, 50, 0.18); }
+        .news-ticker-item--announcement { color: #ffd65a; text-shadow: 0 0 18px rgba(255, 200, 0, 0.14); }
+        .news-ticker-item--new-track { color: var(--neon-cyan); }
+        .news-ticker-sep {
+          color: rgba(165, 235, 248, 0.55);
+          font-size: 0.95rem;
+          padding: 0 6px;
+        }
+        @keyframes news-ticker-marquee {
+          from { transform: translateX(0); }
+          to { transform: translateX(-50%); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .news-ticker-track { animation: none; }
         }
       `}</style>
     </motion.div>
