@@ -47,6 +47,8 @@ export default function Admin() {
   const [hostCfgFixedEverySongs, setHostCfgFixedEverySongs] = useState(2);
   const [hostCfgRandomMinSongs, setHostCfgRandomMinSongs] = useState(2);
   const [hostCfgRandomMaxSongs, setHostCfgRandomMaxSongs] = useState(5);
+  const [hostCfgPlaylistMode, setHostCfgPlaylistMode] = useState('random');
+  const [hostCfgDjTheme, setHostCfgDjTheme] = useState('auto');
   const [hostCfgSaving, setHostCfgSaving] = useState(false);
 
   const fetchPending = () => {
@@ -98,6 +100,8 @@ export default function Admin() {
           const maxRaw = Math.max(1, Math.min(20, Number(data.randomMaxSongs) || 5));
           setHostCfgRandomMinSongs(min);
           setHostCfgRandomMaxSongs(Math.max(min, maxRaw));
+          setHostCfgPlaylistMode(data.radioPlaylistMode === 'dj' ? 'dj' : 'random');
+          setHostCfgDjTheme(String(data.djTheme || 'auto'));
         })
         .catch(() => {})
         .finally(() => setLoading(false));
@@ -424,7 +428,9 @@ export default function Admin() {
         mode: hostCfgMode === 'random' ? 'random' : 'fixed',
         fixedEverySongs,
         randomMinSongs,
-        randomMaxSongs
+        randomMaxSongs,
+        radioPlaylistMode: hostCfgPlaylistMode === 'dj' ? 'dj' : 'random',
+        djTheme: hostCfgDjTheme
       })
       .then(() => setAdminMessage('Настройки ведущего сохранены'))
       .catch((err) => setAdminMessage(err.response?.data?.message || 'Не удалось сохранить настройки ведущего'))
@@ -1037,6 +1043,45 @@ export default function Admin() {
                   onChange={(e) => setHostCfgRandomMaxSongs(Number(e.target.value || 1))}
                   disabled={hostCfgMode !== 'random'}
                 />
+              </label>
+              <h3 className="admin-playlist-form-title" style={{ marginTop: 8 }}>Плейлист эфира</h3>
+              <label className="admin-pl-checkbox">
+                <input
+                  type="radio"
+                  name="playlist-mode"
+                  checked={hostCfgPlaylistMode === 'random'}
+                  onChange={() => setHostCfgPlaylistMode('random')}
+                />
+                Случайный эфир (общий рандом)
+              </label>
+              <label className="admin-pl-checkbox">
+                <input
+                  type="radio"
+                  name="playlist-mode"
+                  checked={hostCfgPlaylistMode === 'dj'}
+                  onChange={() => setHostCfgPlaylistMode('dj')}
+                />
+                Выбор диджея (тематический вайб)
+              </label>
+              <label className="admin-pl-label">
+                Тема/настроение диджея
+                <select
+                  className="admin-comment-input admin-pl-field"
+                  value={hostCfgDjTheme}
+                  onChange={(e) => setHostCfgDjTheme(e.target.value)}
+                  disabled={hostCfgPlaylistMode !== 'dj'}
+                >
+                  <option value="auto">Авто (меняется по времени)</option>
+                  <option value="mixed">Смешанный</option>
+                  <option value="energetic">Энергичный</option>
+                  <option value="chill">Спокойный</option>
+                  <option value="night">Ночной</option>
+                  <option value="rock">Рок</option>
+                  <option value="pop">Поп</option>
+                  <option value="electro">Электро</option>
+                  <option value="hiphop">Хип-хоп</option>
+                  <option value="jazz">Джаз</option>
+                </select>
               </label>
               <div className="admin-pl-form-actions">
                 <button type="submit" className="admin-btn admin-pl-submit" disabled={hostCfgSaving}>
