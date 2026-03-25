@@ -10,10 +10,14 @@ export default function Home() {
   const [latest, setLatest] = useState([]);
   const [popular, setPopular] = useState([]);
   const [playlistList, setPlaylistList] = useState([]);
+  const [announcements, setAnnouncements] = useState([]);
 
   useEffect(() => {
     client.get('/tracks', { params: { limit: 8, sort: '-createdAt' } }).then(r => setLatest(r.data.tracks || [])).catch(() => {});
     charts.weekly().then(r => setPopular((r.data || []).slice(0, 6))).catch(() => {});
+    client.get('/announcements', { params: { limit: 7 } })
+      .then((r) => setAnnouncements(Array.isArray(r.data?.items) ? r.data.items : []))
+      .catch(() => {});
     playlists
       .featured(6)
       .then((r) => {
@@ -38,6 +42,32 @@ export default function Home() {
           <span className="hero-sub-line">слушай, загружай, смотри чарты</span>
         </div>
       </section>
+      {announcements.length > 0 && (
+        <section className="announcements-section">
+          <h3 className="section-title">Анонсы</h3>
+          <div className="announcements-list">
+            {announcements.map((a) => (
+              <Link
+                key={`${a.kind}-${String(a.trackId || '')}`}
+                to={`/track/${a.trackId}`}
+                className={`announcement-item ${a.kind === 'radio' ? 'announcement-item--radio' : ''}`}
+              >
+                {a.kind === 'radio' ? (
+                  <>
+                    <span className="announcement-kind">В эфире</span>
+                    <span className="announcement-title">{a.title}</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="announcement-kind">Новинка</span>
+                    <span className="announcement-title">{a.title}</span>
+                  </>
+                )}
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
       {playlistList.length > 0 && (
         <section>
           <h3 className="section-title">Плейлисты</h3>
@@ -163,6 +193,38 @@ export default function Home() {
         .neon-btn:hover {
           background: rgba(5, 217, 232, 0.2);
           box-shadow: var(--glow-cyan);
+        }
+
+        .announcements-section { margin-top: 18px; }
+        .announcements-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
+        .announcement-item {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          padding: 12px;
+          border-radius: 12px;
+          border: 1px solid rgba(5, 217, 232, 0.28);
+          background: rgba(255, 255, 255, 0.02);
+          text-decoration: none;
+          transition: box-shadow 0.2s, border-color 0.2s, transform 0.2s;
+        }
+        .announcement-item:hover {
+          box-shadow: 0 0 25px rgba(5, 217, 232, 0.18);
+          border-color: rgba(5, 217, 232, 0.55);
+          transform: translateY(-1px);
+        }
+        .announcement-item--radio {
+          border-color: rgba(211, 0, 197, 0.35);
+          box-shadow: 0 0 22px rgba(211, 0, 197, 0.12);
+        }
+        .announcement-kind {
+          font-size: 0.75rem;
+          color: var(--text-dim);
+        }
+        .announcement-title {
+          font-family: var(--font-display);
+          color: var(--neon-cyan);
+          font-size: 0.95rem;
         }
       `}</style>
     </motion.div>
