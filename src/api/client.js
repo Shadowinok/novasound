@@ -262,6 +262,10 @@ export const admin = {
   playlists: (scope = 'editorial') => client.get('/admin/playlists', { params: { scope } }),
   syncHybridPlaylists: () => client.post('/admin/playlists/hybrid/sync'),
   syncMonthlyReleases: () => client.post('/admin/playlists/hybrid/sync-monthly'),
+  radioHostSettings: {
+    get: () => client.get('/admin/radio-host-settings'),
+    update: (data) => client.put('/admin/radio-host-settings', data)
+  },
   users: () => client.get('/admin/users'),
   announcements: {
     list: () => client.get('/admin/announcements'),
