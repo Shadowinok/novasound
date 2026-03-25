@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import ParticleBackground from './ParticleBackground';
 import RadialMenu from './RadialMenu';
 import PlayerBar from './PlayerBar';
+import RadioHost from './RadioHost';
 import './Layout.css';
 
 export default function Layout() {
@@ -55,6 +56,7 @@ export default function Layout() {
         </main>
       </div>
       <PlayerBar />
+      <RadioHost />
       <footer className="site-footer site-footer--dock" aria-label="Служебные ссылки">
         {pathname !== '/about' && <Link to="/about">О проекте</Link>}
         {pathname !== '/terms' && <Link to="/terms">Правила</Link>}
