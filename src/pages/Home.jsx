@@ -94,8 +94,27 @@ export default function Home() {
         return null;
       })
       .filter(Boolean);
-    // Слегка укоротим сообщения, чтобы лента не раздувалась.
-    return segments.map((s) => ({ ...s, text: String(s.text).slice(0, 140) }));
+    // Укорачиваем по-разному: объявления должны читаться полностью.
+    const maxByKind = {
+      announcement: 320,
+      radio: 140,
+      'radio-offline': 80,
+      weather: 120,
+      'ai-news': 160,
+      'ai-creative-news': 180,
+      'ai-music-news': 180,
+      'gaming-news': 180,
+      'film-news': 180,
+      'industry-news': 190,
+      'software-news': 190,
+      'robots-news': 190,
+      'releases-news': 190,
+      'new-track': 120
+    };
+    return segments.map((s) => {
+      const max = maxByKind[s.kind] ?? 160;
+      return { ...s, text: String(s.text).slice(0, max) };
+    });
   }, [announcements]);
 
   const renderTickerSequence = (loopIdx) => {
@@ -276,7 +295,7 @@ export default function Home() {
           width: max-content;
           padding: 10px 0;
           gap: 0;
-          animation: news-ticker-marquee 55s linear infinite;
+          animation: news-ticker-marquee 110s linear infinite;
           will-change: transform;
         }
         .news-ticker:hover .news-ticker-track { animation-play-state: paused; }
