@@ -9,16 +9,20 @@ import { usePlayer } from '../context/PlayerContext';
  * Этап 0 из docs/развитие радио.md — честный статус без фейкового «эфира»
  */
 export default function Radio() {
-  const { loadTrack, currentTrack, queue, queueIndex, isRadioMode, playing } = usePlayer();
+  const {
+    loadTrack, currentTrack, queue, queueIndex, isRadioMode, playing, volume, setPlayerVolume
+  } = usePlayer();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [radio, setRadio] = useState({ now: null, next: [], history: [], queue: [], nowOffsetSec: 0 });
   const [hostNews, setHostNews] = useState([]);
-  const [hostCaption, setHostCaption] = useState('');
   const hostTimerRef = useRef(null);
   const lastSpokenKeyRef = useRef('');
-  const speakingRef = useRef(false);
   const ttsAudioRef = useRef(null);
+  const hostPlayingRef = useRef(false);
+  const restoreVolumeRef = useRef(null);
+  const spokenTitlesRef = useRef([]);
+  const hostLastAtRef = useRef(0);
 
   const activeNow = isRadioMode && currentTrack ? currentTrack : radio.now;
   const activeNext = isRadioMode && Array.isArray(queue) && queue.length
@@ -135,42 +139,49 @@ export default function Radio() {
     return s;
   };
 
-  const speakLine = (text, { langCode, rate = 1.02 } = {}) => {
-    if (!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) return Promise.resolve(false);
+  const speakLine = (text) => {
     if (!text) return Promise.resolve(false);
-    const synth = window.speechSynthesis;
-    const Utter = window.SpeechSynthesisUtterance;
-    const u = new Utter(text);
-    if (langCode) u.lang = langCode;
-    u.rate = rate;
-    u.volume = 1;
-    u.pitch = 0.95;
-
-    // Выбираем “ru-голос” получше, если он есть.
-    try {
-      const voices = synth.getVoices?.() || [];
-      const ruPrefix = langCode ? String(langCode).split('-')[0].toLowerCase() : '';
-      const candidates = ruPrefix
-        ? voices.filter((v) => String(v.lang || '').toLowerCase().startsWith(ruPrefix))
-        : voices;
-      const preferred = candidates.filter((v) => {
-        const name = String(v.name || '').toLowerCase();
-        return name.includes('pavel') || name.includes('igor') || name.includes('male') || name.includes('russian');
-      });
-      u.voice = preferred[0] || candidates[0] || undefined;
-    } catch (_) {}
-    speakingRef.current = true;
-    return new Promise((resolve) => {
-      u.onend = () => {
-        speakingRef.current = false;
-        resolve(true);
-      };
-      u.onerror = () => {
-        speakingRef.current = false;
-        resolve(false);
-      };
-      synth.speak(u);
-    });
+    const voicePool = ['ru-RU-DmitryNeural', 'ru-RU-MaximNeural', 'ru-RU-PavelNeural'];
+    const tryVoice = (idx) => {
+      if (idx >= voicePool.length) return Promise.resolve(false);
+      return client.get('/announcements/tts', {
+        params: {
+          text,
+          voice: voicePool[idx],
+          rate: '-2%'
+        },
+        responseType: 'blob'
+      }).then(({ data }) => {
+        if (!(data instanceof Blob)) return tryVoice(idx + 1);
+        const blobUrl = URL.createObjectURL(data);
+        return new Promise((resolve) => {
+          try {
+            if (ttsAudioRef.current) {
+              try { ttsAudioRef.current.pause(); } catch (_) {}
+              ttsAudioRef.current = null;
+            }
+            const audio = new Audio(blobUrl);
+            ttsAudioRef.current = audio;
+            audio.onended = () => {
+              URL.revokeObjectURL(blobUrl);
+              resolve(true);
+            };
+            audio.onerror = () => {
+              URL.revokeObjectURL(blobUrl);
+              resolve(false);
+            };
+            audio.play().catch(() => {
+              URL.revokeObjectURL(blobUrl);
+              resolve(false);
+            });
+          } catch (_) {
+            URL.revokeObjectURL(blobUrl);
+            resolve(false);
+          }
+        });
+      }).catch(() => tryVoice(idx + 1));
+    };
+    return tryVoice(0);
   };
 
   const hasVoiceForLang = (langCode) => {
@@ -188,15 +199,21 @@ export default function Radio() {
     if (!activeNow) return;
     if (!nextTrack) return;
     if (!hostCandidates.length) return;
+    const nowTs = Date.now();
+    if (nowTs - hostLastAtRef.current < 25000) return;
 
     const trackKey = `${currentTrackId}`;
     if (!trackKey) return;
-    if (lastSpokenKeyRef.current === trackKey) return;
-    lastSpokenKeyRef.current = trackKey;
+    if (lastSpokenKeyRef.current === trackKey && hostPlayingRef.current) return;
 
+    const spoken = spokenTitlesRef.current;
     const sorted = [...hostCandidates].sort((a, b) => scoreHostTitle(b.title) - scoreHostTitle(a.title));
-    const best = sorted[0] || hostCandidates[0];
+    const best = sorted.find((x) => {
+      const title = String(x?.title || '');
+      return title && !spoken.includes(title);
+    }) || sorted[0] || hostCandidates[0];
     if (!best?.title) return;
+    lastSpokenKeyRef.current = trackKey;
 
     const langHint = detectLangHint(best.title);
     const langAvailable = langHint ? hasVoiceForLang(langHint.langCode) : false;
@@ -322,23 +339,29 @@ export default function Radio() {
       scriptLines.push(randPick(explainTemplates.noLang));
     }
 
-    const shortCaption = scriptLines.slice(0, 2).join(' ');
-    setHostCaption(shortCaption.slice(0, 220));
-
     try {
-      window.speechSynthesis?.cancel?.();
+      if (hostPlayingRef.current) return;
+      hostPlayingRef.current = true;
+      restoreVolumeRef.current = Number(volume);
+      const lowered = Math.max(0.16, Number(volume) * 0.28);
+      setPlayerVolume(lowered);
       // Говорим последовательно: ждём завершения каждой строки.
       // eslint-disable-next-line no-restricted-syntax
       for (const line of scriptLines) {
-        // Если есть подсказка языка — пробуем переключать движок.
-        // Текст всё равно русский, но langCode влияет на выбор голоса (если поддерживается).
         // eslint-disable-next-line no-await-in-loop
-        await speakLine(line, { langCode: (langHint && langAvailable) ? langHint.langCode : 'ru-RU', rate: 1.03 });
+        await speakLine(line);
       }
+      hostLastAtRef.current = Date.now();
+      const nextSpoken = [...spokenTitlesRef.current, String(best.title || '')].slice(-10);
+      spokenTitlesRef.current = nextSpoken;
     } catch (_) {
       // Не ломаем радио, если TTS не поддерживается.
+    } finally {
+      const restore = Number(restoreVolumeRef.current);
+      if (Number.isFinite(restore)) setPlayerVolume(restore);
+      hostPlayingRef.current = false;
     }
-  }, [activeNow, hostCandidates, isRadioMode, nextTrack, playing, currentTrackId]);
+  }, [activeNow, hostCandidates, isRadioMode, nextTrack, playing, currentTrackId, setPlayerVolume, volume]);
 
   useEffect(() => {
     const poll = setInterval(() => {
@@ -348,18 +371,24 @@ export default function Radio() {
   }, [loadRadio]);
 
   useEffect(() => {
-    // Если пользователь поставил радио на паузу — останавливаем ведущего.
-    if (!playing) window.speechSynthesis?.cancel?.();
-  }, [playing]);
+    if (playing) return;
+    if (ttsAudioRef.current) {
+      try { ttsAudioRef.current.pause(); } catch (_) {}
+      ttsAudioRef.current = null;
+    }
+    hostPlayingRef.current = false;
+    const restore = Number(restoreVolumeRef.current);
+    if (Number.isFinite(restore)) setPlayerVolume(restore);
+  }, [playing, setPlayerVolume]);
 
-  useEffect(() => {
-    // Запускаем ведущего только когда стартует текущий эфирный трек.
-    if (!isRadioMode) return;
-    if (!playing) return;
-    if (!nextTrack) return;
-    if (!currentTrackId) return;
-    speakHostForTrack();
-  }, [isRadioMode, playing, currentTrackId, nextTrack?._id, speakHostForTrack]);
+  useEffect(() => () => {
+    if (ttsAudioRef.current) {
+      try { ttsAudioRef.current.pause(); } catch (_) {}
+      ttsAudioRef.current = null;
+    }
+    const restore = Number(restoreVolumeRef.current);
+    if (Number.isFinite(restore)) setPlayerVolume(restore);
+  }, [setPlayerVolume]);
 
   const startRadio = () => {
     if (!radio.now || !radio.queue.length) return;
@@ -397,7 +426,6 @@ export default function Radio() {
               <p>
                 В эфире: <b>{activeNow.title}</b> — {activeNow.author?.username || 'Неизвестный автор'}
               </p>
-              {!!hostCaption && <p className="radio-host-caption">ИИ-ведущий: {hostCaption}</p>}
               {!!activeNext.length && (
                 <ul>
                   {activeNext.map((t) => (
@@ -483,12 +511,6 @@ export default function Radio() {
         @keyframes radioSpin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
-        }
-        .radio-host-caption {
-          margin-top: 10px;
-          color: var(--text-dim);
-          font-size: 0.92rem;
-          line-height: 1.4;
         }
         .radio-block h2 {
           font-size: 1.1rem;
