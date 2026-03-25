@@ -72,6 +72,15 @@ export default function Home() {
         if (a.kind === 'ai-music-news') {
           return { kind: 'ai-music-news', text: `ИИ-музыка: ${a.title}` };
         }
+        if (a.kind === 'gaming-news') {
+          return { kind: 'gaming-news', text: `Игры: ${a.title}` };
+        }
+        if (a.kind === 'film-news') {
+          return { kind: 'film-news', text: `Кино: ${a.title}` };
+        }
+        if (a.kind === 'industry-news') {
+          return { kind: 'industry-news', text: `Цифровая индустрия: ${a.title}` };
+        }
         if (a.kind === 'new-track') return { kind: 'new-track', text: `Новинка: ${a.title}` };
         return null;
       })
@@ -275,6 +284,9 @@ export default function Home() {
         .news-ticker-item--ai-news { color: #c6b6ff; text-shadow: 0 0 18px rgba(160, 120, 255, 0.16); }
         .news-ticker-item--ai-creative-news { color: #ffd3ff; text-shadow: 0 0 18px rgba(255, 120, 255, 0.16); }
         .news-ticker-item--ai-music-news { color: #b9ffda; text-shadow: 0 0 18px rgba(0, 255, 160, 0.14); }
+        .news-ticker-item--gaming-news { color: #ffe08a; text-shadow: 0 0 18px rgba(255, 220, 80, 0.14); }
+        .news-ticker-item--film-news { color: #ff9ad5; text-shadow: 0 0 18px rgba(255, 120, 220, 0.14); }
+        .news-ticker-item--industry-news { color: var(--neon-cyan); text-shadow: 0 0 18px rgba(5, 217, 232, 0.16); }
         .news-ticker-item--weather { color: #9ee7ff; text-shadow: 0 0 18px rgba(70, 190, 255, 0.16); }
         .news-ticker-item--new-track { color: var(--neon-cyan); }
         .news-ticker-sep {
