@@ -14,7 +14,14 @@ export default function Radio() {
   } = usePlayer();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [radio, setRadio] = useState({ now: null, next: [], history: [], queue: [], nowOffsetSec: 0 });
+  const [radio, setRadio] = useState({
+    now: null,
+    next: [],
+    history: [],
+    queue: [],
+    nowOffsetSec: 0,
+    djEpisode: null
+  });
   const [hostNews, setHostNews] = useState([]);
   const [hostSchedule, setHostSchedule] = useState({
     mode: 'fixed',
@@ -24,6 +31,7 @@ export default function Radio() {
   });
   const hostTimerRef = useRef(null);
   const lastSpokenKeyRef = useRef('');
+  const lastEpisodeAnnouncedRef = useRef('');
   const ttsAudioRef = useRef(null);
   const hostPlayingRef = useRef(false);
   const restoreVolumeRef = useRef(null);
@@ -36,6 +44,7 @@ export default function Radio() {
   const activeNext = isRadioMode && Array.isArray(queue) && queue.length
     ? queue.slice(queueIndex + 1, queueIndex + 6)
     : radio.next;
+  const djEpisode = radio?.djEpisode || null;
   const nextTrack = Array.isArray(activeNext) && activeNext.length ? activeNext[0] : null;
   const currentTrackId = currentTrack?._id ? String(currentTrack._id) : '';
 
@@ -50,7 +59,8 @@ export default function Radio() {
         next: Array.isArray(data?.next) ? data.next : [],
         history: Array.isArray(data?.history) ? data.history : [],
         queue: Array.isArray(data?.queue) ? data.queue : [],
-        nowOffsetSec: Number(data?.nowOffsetSec) || 0
+        nowOffsetSec: Number(data?.nowOffsetSec) || 0,
+        djEpisode: data?.djEpisode || null
       };
       setRadio(nextRadio);
 
@@ -355,7 +365,50 @@ export default function Radio() {
     const joke = randPick(jokeTemplates[kind]);
     const meta = randPick(metaTemplates);
 
-    const scriptLines = [intro, joke, meta];
+    const buildEpisodeLine = (episode) => {
+      if (!episode?.tag) return '';
+      const moodType = String(episode.moodType || '');
+      const seedStr = String(episode.id || '');
+      // Простейший детерминированный выбор (чтобы всем одинаково в одном эфире).
+      let seed = 0;
+      for (const ch of seedStr) seed = (seed * 31 + ch.charCodeAt(0)) >>> 0;
+
+      const pick = (arr) => arr[seed % arr.length];
+      if (moodType === 'morning_chill') {
+        return pick([
+          `Лови утренний чилл: ${episode.tag}.`,
+          `Это утренний вайб без лишних слов: ${episode.tag}.`,
+          `Утро включило свой режим: ${episode.tag}.`
+        ]);
+      }
+      if (moodType === 'morning_sad') {
+        return pick([
+          `Утренний вайб с мягким грустняком: ${episode.tag}.`,
+          `Сегодня утро умеет быть кинематографичным: ${episode.tag}.`,
+          `Дождь внутри и снаружи — утренний вайб: ${episode.tag}.`
+        ]);
+      }
+      if (moodType === 'night_chill') {
+        return pick([
+          `Ночной чилл включён: ${episode.tag}.`,
+          `После полуночи всё вкуснее — ночной вайб: ${episode.tag}.`,
+          `Тихий режим города: ${episode.tag}.`
+        ]);
+      }
+      return pick([
+        `Сегодня у нас особый вайб: ${episode.tag}.`,
+        `Включаем настроение: ${episode.tag}.`
+      ]);
+    };
+
+    let episodeLine = '';
+    const epId = djEpisode?.id ? String(djEpisode.id) : '';
+    if (epId && lastEpisodeAnnouncedRef.current !== epId) {
+      lastEpisodeAnnouncedRef.current = epId;
+      episodeLine = buildEpisodeLine(djEpisode);
+    }
+
+    const scriptLines = episodeLine ? [episodeLine, intro, meta] : [intro, joke, meta];
 
     if (langHint) {
       if (langAvailable) {
@@ -394,7 +447,7 @@ export default function Radio() {
       if (Number.isFinite(restore)) setPlayerVolume(restore);
       hostPlayingRef.current = false;
     }
-  }, [activeNow, hostCandidates, isRadioMode, nextTrack, playing, currentTrackId, setPlayerVolume, volume]);
+  }, [activeNow, hostCandidates, isRadioMode, nextTrack, playing, currentTrackId, setPlayerVolume, volume, djEpisode]);
 
   useEffect(() => {
     if (!isRadioMode || !playing || !currentTrackId) return;
