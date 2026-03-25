@@ -18,6 +18,7 @@ export default function Radio() {
   const hostTimerRef = useRef(null);
   const lastSpokenKeyRef = useRef('');
   const speakingRef = useRef(false);
+  const ttsAudioRef = useRef(null);
 
   const activeNow = isRadioMode && currentTrack ? currentTrack : radio.now;
   const activeNext = isRadioMode && Array.isArray(queue) && queue.length
@@ -103,6 +104,23 @@ export default function Radio() {
     return null;
   };
 
+  const transcribeNickToSpokenRu = (nick) => {
+    const s = String(nick || '').trim();
+    if (!s) return s;
+    if (/[А-Яа-яЁё]/.test(s)) return s.toUpperCase();
+    const map = {
+      A: 'А', B: 'Б', C: 'С', D: 'Д', E: 'Е', F: 'Ф', G: 'Г', H: 'Х', I: 'И', J: 'Й',
+      K: 'К', L: 'Л', M: 'М', N: 'Н', O: 'О', P: 'П', Q: 'КУ', R: 'Р', S: 'С',
+      T: 'Т', U: 'У', V: 'В', W: 'В', X: 'КС', Y: 'Ы', Z: 'З'
+    };
+    const up = s.toUpperCase();
+    const out = up
+      .split('')
+      .map((ch) => map[ch] || '')
+      .join('');
+    return out || s;
+  };
+
   const scoreHostTitle = (title) => {
     const t = String(title || '');
     const lt = t.toLowerCase();
@@ -125,6 +143,22 @@ export default function Radio() {
     const u = new Utter(text);
     if (langCode) u.lang = langCode;
     u.rate = rate;
+    u.volume = 1;
+    u.pitch = 0.95;
+
+    // Выбираем “ru-голос” получше, если он есть.
+    try {
+      const voices = synth.getVoices?.() || [];
+      const ruPrefix = langCode ? String(langCode).split('-')[0].toLowerCase() : '';
+      const candidates = ruPrefix
+        ? voices.filter((v) => String(v.lang || '').toLowerCase().startsWith(ruPrefix))
+        : voices;
+      const preferred = candidates.filter((v) => {
+        const name = String(v.name || '').toLowerCase();
+        return name.includes('pavel') || name.includes('igor') || name.includes('male') || name.includes('russian');
+      });
+      u.voice = preferred[0] || candidates[0] || undefined;
+    } catch (_) {}
     speakingRef.current = true;
     return new Promise((resolve) => {
       u.onend = () => {
@@ -168,8 +202,9 @@ export default function Radio() {
     const langAvailable = langHint ? hasVoiceForLang(langHint.langCode) : false;
 
     const nextTitle = nextTrack.title || 'следующая песня';
-    const nextAuthor = nextTrack.author?.username || '—';
-    const announcement = `Следующая песня: ${nextTitle}. Автор: ${nextAuthor}.`;
+    const nextAuthorRaw = nextTrack.author?.username || '—';
+    const nextAuthorSpoken = transcribeNickToSpokenRu(nextAuthorRaw);
+    const announcement = `Следующая песня: ${nextTitle}. Автор: ${nextAuthorSpoken}.`;
 
     const title = String(best.title).slice(0, 120);
 
