@@ -244,21 +244,26 @@ export default function Radio() {
     if (!playing) return;
     if (!activeNow) return;
     if (!nextTrack) return;
-    if (!hostCandidates.length) return;
     const trackKey = `${currentTrackId}`;
     if (!trackKey) return;
     if (lastSpokenKeyRef.current === trackKey && hostPlayingRef.current) return;
 
     const spoken = spokenTitlesRef.current;
-    const sorted = [...hostCandidates].sort((a, b) => scoreHostTitle(b.title) - scoreHostTitle(a.title));
-    const best = sorted.find((x) => {
-      const title = String(x?.title || '');
-      return title && !spoken.includes(title);
-    }) || sorted[0] || hostCandidates[0];
-    if (!best?.title) return;
+    let best = null;
+    if (hostCandidates.length) {
+      const sorted = [...hostCandidates].sort((a, b) => scoreHostTitle(b.title) - scoreHostTitle(a.title));
+      best = sorted.find((x) => {
+        const title = String(x?.title || '');
+        return title && !spoken.includes(title);
+      }) || sorted[0] || hostCandidates[0];
+    }
+
+    const fallbackBestTitle = String(djEpisode?.tag || nextTrack.title || 'следующая песня');
+    const bestTitle = String(best?.title || fallbackBestTitle);
+    if (!bestTitle.trim()) return;
     lastSpokenKeyRef.current = trackKey;
 
-    const langHint = detectLangHint(best.title);
+    const langHint = detectLangHint(bestTitle);
     const langAvailable = langHint ? hasVoiceForLang(langHint.langCode) : false;
 
     const nextTitle = nextTrack.title || 'следующая песня';
@@ -266,7 +271,7 @@ export default function Radio() {
     const nextAuthorSpoken = transcribeNickToSpokenRu(nextAuthorRaw);
     const announcement = `Следующая песня: ${nextTitle}. Автор: ${nextAuthorSpoken}.`;
 
-    const title = String(best.title).slice(0, 120);
+    const title = bestTitle.slice(0, 120);
 
     const randPick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
@@ -438,8 +443,10 @@ export default function Radio() {
         await speakLine(line);
       }
       hostLastAtRef.current = Date.now();
-      const nextSpoken = [...spokenTitlesRef.current, String(best.title || '')].slice(-10);
-      spokenTitlesRef.current = nextSpoken;
+      if (best?.title) {
+        const nextSpoken = [...spokenTitlesRef.current, String(best.title || '')].slice(-10);
+        spokenTitlesRef.current = nextSpoken;
+      }
     } catch (_) {
       // Не ломаем радио, если TTS не поддерживается.
     } finally {
