@@ -66,6 +66,9 @@ export default function Home() {
         if (a.kind === 'ai-news') {
           return { kind: 'ai-news', text: `ИИ: ${a.title}` };
         }
+        if (a.kind === 'ai-creative-news') {
+          return { kind: 'ai-creative-news', text: `ИИ-креатив: ${a.title}` };
+        }
         if (a.kind === 'ai-music-news') {
           return { kind: 'ai-music-news', text: `ИИ-музыка: ${a.title}` };
         }
@@ -270,6 +273,7 @@ export default function Home() {
         .news-ticker-item--radio-offline { color: #ff6b6b; text-shadow: 0 0 18px rgba(255, 50, 50, 0.18); }
         .news-ticker-item--announcement { color: #ffd65a; text-shadow: 0 0 18px rgba(255, 200, 0, 0.14); }
         .news-ticker-item--ai-news { color: #c6b6ff; text-shadow: 0 0 18px rgba(160, 120, 255, 0.16); }
+        .news-ticker-item--ai-creative-news { color: #ffd3ff; text-shadow: 0 0 18px rgba(255, 120, 255, 0.16); }
         .news-ticker-item--ai-music-news { color: #b9ffda; text-shadow: 0 0 18px rgba(0, 255, 160, 0.14); }
         .news-ticker-item--weather { color: #9ee7ff; text-shadow: 0 0 18px rgba(70, 190, 255, 0.16); }
         .news-ticker-item--new-track { color: var(--neon-cyan); }
