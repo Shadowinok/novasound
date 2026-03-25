@@ -263,6 +263,12 @@ export const admin = {
   syncHybridPlaylists: () => client.post('/admin/playlists/hybrid/sync'),
   syncMonthlyReleases: () => client.post('/admin/playlists/hybrid/sync-monthly'),
   users: () => client.get('/admin/users'),
+  announcements: {
+    list: () => client.get('/admin/announcements'),
+    create: (data) => client.post('/admin/announcements', data),
+    update: (id, data) => client.put(`/admin/announcements/${id}`, data),
+    delete: (id) => client.delete(`/admin/announcements/${id}`)
+  },
   deleteUser: (id, reason) => client.delete(`/admin/users/${id}`, { data: { reason } }),
   pendingTracks: () => client.get('/admin/tracks/pending'),
   coverPending: () => client.get('/admin/tracks/cover-pending'),
