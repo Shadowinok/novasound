@@ -23,6 +23,9 @@ export default function Radio() {
   const restoreVolumeRef = useRef(null);
   const spokenTitlesRef = useRef([]);
   const hostLastAtRef = useRef(0);
+  const hostNextAllowedAtRef = useRef(0);
+  const HOST_REP_MIN_MS = 60000; // минимум между репликами
+  const HOST_REP_MAX_MS = 150000; // максимум (для “случайных промежутков”)
 
   const activeNow = isRadioMode && currentTrack ? currentTrack : radio.now;
   const activeNext = isRadioMode && Array.isArray(queue) && queue.length
@@ -200,7 +203,7 @@ export default function Radio() {
     if (!nextTrack) return;
     if (!hostCandidates.length) return;
     const nowTs = Date.now();
-    if (nowTs - hostLastAtRef.current < 25000) return;
+    if (nowTs < hostNextAllowedAtRef.current) return;
 
     const trackKey = `${currentTrackId}`;
     if (!trackKey) return;
@@ -360,6 +363,12 @@ export default function Radio() {
       const restore = Number(restoreVolumeRef.current);
       if (Number.isFinite(restore)) setPlayerVolume(restore);
       hostPlayingRef.current = false;
+
+      // Следующее разрешённое время (случайный промежуток)
+      const baseNow = Date.now();
+      const randMs = HOST_REP_MIN_MS + Math.random() * (HOST_REP_MAX_MS - HOST_REP_MIN_MS);
+      hostLastAtRef.current = baseNow;
+      hostNextAllowedAtRef.current = baseNow + randMs;
     }
   }, [activeNow, hostCandidates, isRadioMode, nextTrack, playing, currentTrackId, setPlayerVolume, volume]);
 
