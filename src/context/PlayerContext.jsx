@@ -20,10 +20,12 @@ export function PlayerProvider({ children }) {
     return 1;
   });
   const audioRef = useRef(null);
+  const isRadioModeRef = useRef(false);
   const queueRef = useRef([]);
   const queueIndexRef = useRef(0);
   const repeatModeRef = useRef('all');
   const desiredPlayingRef = useRef(false);
+  const radioAutoResumeCooldownRef = useRef(0);
   const playerDebugRef = useRef(localStorage.getItem('novasound_player_debug') === '1');
 
   const debugLog = useCallback((event, payload = {}) => {
@@ -50,6 +52,7 @@ export function PlayerProvider({ children }) {
     setQueue([]);
     setQueueIndex(0);
     setIsRadioMode(false);
+    isRadioModeRef.current = false;
     queueRef.current = [];
     queueIndexRef.current = 0;
   }, []);
@@ -114,7 +117,24 @@ export function PlayerProvider({ children }) {
     });
 
     audio.addEventListener('play', () => setPlaying(true));
-    audio.addEventListener('pause', () => setPlaying(false));
+    audio.addEventListener('pause', () => {
+      setPlaying(false);
+      // Иногда браузер ставит audio на паузу при навигации/параллельных аудио.
+      // В радио-режиме аккуратно пытаемся вернуть воспроизведение,
+      // но только если мы "ожидаем играть" (пауза не от пользователя).
+      if (!isRadioModeRef.current) return;
+      if (!desiredPlayingRef.current) return;
+      if (audioRef.current !== audio) return;
+      const now = Date.now();
+      if (now - radioAutoResumeCooldownRef.current < 1500) return;
+      radioAutoResumeCooldownRef.current = now;
+      window.setTimeout(() => {
+        if (audioRef.current !== audio) return;
+        audio.play()
+          .then(() => setPlaying(true))
+          .catch(() => {});
+      }, 350);
+    });
     audio.addEventListener('seeking', () => debugLog('seeking', { to: audio.currentTime }));
     audio.addEventListener('seeked', () => debugLog('seeked', { to: audio.currentTime }));
     audio.addEventListener('waiting', () => debugLog('waiting', { at: audio.currentTime }));
@@ -179,6 +199,7 @@ export function PlayerProvider({ children }) {
     }
     const radioMode = Boolean(options.isRadio);
     setIsRadioMode(radioMode);
+    isRadioModeRef.current = radioMode;
     if (radioMode) {
       setRepeatMode('all');
     }
