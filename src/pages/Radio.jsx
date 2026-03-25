@@ -16,6 +16,12 @@ export default function Radio() {
   const [error, setError] = useState('');
   const [radio, setRadio] = useState({ now: null, next: [], history: [], queue: [], nowOffsetSec: 0 });
   const [hostNews, setHostNews] = useState([]);
+  const [hostSchedule, setHostSchedule] = useState({
+    mode: 'fixed',
+    fixedEverySongs: 2,
+    randomMinSongs: 2,
+    randomMaxSongs: 5
+  });
   const hostTimerRef = useRef(null);
   const lastSpokenKeyRef = useRef('');
   const ttsAudioRef = useRef(null);
@@ -24,7 +30,7 @@ export default function Radio() {
   const spokenTitlesRef = useRef([]);
   const hostTrackCounterRef = useRef(0);
   const lastCountedTrackKeyRef = useRef('');
-  const HOST_SPEAK_EVERY_N_TRACKS = 2; // ведущий говорит на каждом N-м треке
+  const hostNextAfterTracksRef = useRef(2);
 
   const activeNow = isRadioMode && currentTrack ? currentTrack : radio.now;
   const activeNext = isRadioMode && Array.isArray(queue) && queue.length
@@ -83,6 +89,34 @@ export default function Radio() {
       if (hostTimerRef.current) window.clearInterval(hostTimerRef.current);
     };
   }, [loadHostNews]);
+
+  const loadHostSettings = useCallback(async () => {
+    try {
+      const { data } = await client.get('/announcements/host-settings');
+      const mode = data?.mode === 'random' ? 'random' : 'fixed';
+      const fixedEverySongs = Math.max(1, Math.min(20, Number(data?.fixedEverySongs) || 2));
+      const randomMinSongs = Math.max(1, Math.min(20, Number(data?.randomMinSongs) || 2));
+      const randomMaxSongsRaw = Math.max(1, Math.min(20, Number(data?.randomMaxSongs) || 5));
+      const randomMaxSongs = Math.max(randomMinSongs, randomMaxSongsRaw);
+      setHostSchedule({ mode, fixedEverySongs, randomMinSongs, randomMaxSongs });
+    } catch (_) {}
+  }, []);
+
+  useEffect(() => {
+    loadHostSettings();
+    const id = window.setInterval(loadHostSettings, 60000);
+    return () => window.clearInterval(id);
+  }, [loadHostSettings]);
+
+  useEffect(() => {
+    if (hostSchedule.mode === 'random') {
+      const min = Math.max(1, Number(hostSchedule.randomMinSongs) || 2);
+      const max = Math.max(min, Number(hostSchedule.randomMaxSongs) || 5);
+      hostNextAfterTracksRef.current = Math.floor(min + Math.random() * (max - min + 1));
+      return;
+    }
+    hostNextAfterTracksRef.current = Math.max(1, Number(hostSchedule.fixedEverySongs) || 2);
+  }, [hostSchedule]);
 
   const hostCandidates = useMemo(() => {
     const items = Array.isArray(hostNews) ? hostNews : [];
@@ -367,9 +401,18 @@ export default function Radio() {
     if (lastCountedTrackKeyRef.current === currentTrackId) return;
     lastCountedTrackKeyRef.current = currentTrackId;
     hostTrackCounterRef.current += 1;
-    if (hostTrackCounterRef.current % HOST_SPEAK_EVERY_N_TRACKS !== 0) return;
+    if (hostTrackCounterRef.current < hostNextAfterTracksRef.current) return;
+    hostTrackCounterRef.current = 0;
+    const mode = hostSchedule.mode === 'random' ? 'random' : 'fixed';
+    if (mode === 'random') {
+      const min = Math.max(1, Number(hostSchedule.randomMinSongs) || 2);
+      const max = Math.max(min, Number(hostSchedule.randomMaxSongs) || 5);
+      hostNextAfterTracksRef.current = Math.floor(min + Math.random() * (max - min + 1));
+    } else {
+      hostNextAfterTracksRef.current = Math.max(1, Number(hostSchedule.fixedEverySongs) || 2);
+    }
     speakHostForTrack();
-  }, [isRadioMode, playing, currentTrackId, speakHostForTrack]);
+  }, [isRadioMode, playing, currentTrackId, speakHostForTrack, hostSchedule]);
 
   useEffect(() => {
     const poll = setInterval(() => {

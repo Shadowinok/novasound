@@ -43,6 +43,11 @@ export default function Admin() {
   const [plFormErr, setPlFormErr] = useState('');
   const [plScope, setPlScope] = useState('editorial');
   const [plHomeFilter, setPlHomeFilter] = useState('all');
+  const [hostCfgMode, setHostCfgMode] = useState('fixed');
+  const [hostCfgFixedEverySongs, setHostCfgFixedEverySongs] = useState(2);
+  const [hostCfgRandomMinSongs, setHostCfgRandomMinSongs] = useState(2);
+  const [hostCfgRandomMaxSongs, setHostCfgRandomMaxSongs] = useState(5);
+  const [hostCfgSaving, setHostCfgSaving] = useState(false);
 
   const fetchPending = () => {
     adminApi.pendingTracks().then((r) => setPending(r.data || [])).catch(() => setPending([]));
@@ -81,6 +86,20 @@ export default function Admin() {
         .list()
         .then((r) => setAnnouncements(r.data || []))
         .catch(() => setAnnouncements([]))
+        .finally(() => setLoading(false));
+    } else if (tab === 'radio-host') {
+      adminApi.radioHostSettings
+        .get()
+        .then((r) => {
+          const data = r?.data || {};
+          setHostCfgMode(data.mode === 'random' ? 'random' : 'fixed');
+          setHostCfgFixedEverySongs(Math.max(1, Math.min(20, Number(data.fixedEverySongs) || 2)));
+          const min = Math.max(1, Math.min(20, Number(data.randomMinSongs) || 2));
+          const maxRaw = Math.max(1, Math.min(20, Number(data.randomMaxSongs) || 5));
+          setHostCfgRandomMinSongs(min);
+          setHostCfgRandomMaxSongs(Math.max(min, maxRaw));
+        })
+        .catch(() => {})
         .finally(() => setLoading(false));
     } else {
       adminApi.users().then((r) => setUsers(r.data || [])).catch(() => setUsers([])).finally(() => setLoading(false));
@@ -389,6 +408,29 @@ export default function Admin() {
     return playlists;
   }, [playlists, plHomeFilter]);
 
+  const saveHostSettings = (e) => {
+    e.preventDefault();
+    const fixedEverySongs = Math.max(1, Math.min(20, Number(hostCfgFixedEverySongs) || 2));
+    const randomMinSongs = Math.max(1, Math.min(20, Number(hostCfgRandomMinSongs) || 2));
+    const randomMaxSongsRaw = Math.max(1, Math.min(20, Number(hostCfgRandomMaxSongs) || 5));
+    const randomMaxSongs = Math.max(randomMinSongs, randomMaxSongsRaw);
+    setHostCfgFixedEverySongs(fixedEverySongs);
+    setHostCfgRandomMinSongs(randomMinSongs);
+    setHostCfgRandomMaxSongs(randomMaxSongs);
+    setHostCfgSaving(true);
+    setAdminMessage('');
+    adminApi.radioHostSettings
+      .update({
+        mode: hostCfgMode === 'random' ? 'random' : 'fixed',
+        fixedEverySongs,
+        randomMinSongs,
+        randomMaxSongs
+      })
+      .then(() => setAdminMessage('Настройки ведущего сохранены'))
+      .catch((err) => setAdminMessage(err.response?.data?.message || 'Не удалось сохранить настройки ведущего'))
+      .finally(() => setHostCfgSaving(false));
+  };
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="page admin-page">
       <h2 className="page-title">Админ-панель</h2>
@@ -399,6 +441,7 @@ export default function Admin() {
         <button type="button" className={tab === 'users' ? 'active' : ''} onClick={() => setTab('users')}>Пользователи</button>
         <button type="button" className={tab === 'reports' ? 'active' : ''} onClick={() => setTab('reports')}>Жалобы на треки</button>
         <button type="button" className={tab === 'announcements' ? 'active' : ''} onClick={() => setTab('announcements')}>Анонсы</button>
+        <button type="button" className={tab === 'radio-host' ? 'active' : ''} onClick={() => setTab('radio-host')}>Радио ведущий</button>
       </div>
       {tab === 'covers' && (
         <>
@@ -895,6 +938,81 @@ export default function Admin() {
                 </div>
               ))}
             </div>
+          )}
+        </div>
+      )}
+      {tab === 'radio-host' && (
+        <div className="admin-announcements">
+          <p className="admin-hint">Управление периодичностью реплик ведущего в радио-режиме (по трекам).</p>
+          {adminMessage && <div className="admin-message">{adminMessage}</div>}
+          {loading ? (
+            <div className="loading">Загрузка...</div>
+          ) : (
+            <form className="admin-playlist-form admin-ann-form" onSubmit={saveHostSettings}>
+              <h3 className="admin-playlist-form-title">Периодичность ведущего</h3>
+              <label className="admin-pl-checkbox">
+                <input
+                  type="radio"
+                  name="host-mode"
+                  checked={hostCfgMode === 'fixed'}
+                  onChange={() => setHostCfgMode('fixed')}
+                />
+                Жесткий интервал (каждые N песен)
+              </label>
+              <label className="admin-pl-label">
+                N песен
+                <input
+                  type="number"
+                  min="1"
+                  max="20"
+                  step="1"
+                  className="admin-comment-input admin-pl-field"
+                  value={hostCfgFixedEverySongs}
+                  onChange={(e) => setHostCfgFixedEverySongs(Number(e.target.value || 1))}
+                  disabled={hostCfgMode !== 'fixed'}
+                />
+              </label>
+              <label className="admin-pl-checkbox">
+                <input
+                  type="radio"
+                  name="host-mode"
+                  checked={hostCfgMode === 'random'}
+                  onChange={() => setHostCfgMode('random')}
+                />
+                Случайный диапазон (вразнобой)
+              </label>
+              <label className="admin-pl-label">
+                Минимум песен
+                <input
+                  type="number"
+                  min="1"
+                  max="20"
+                  step="1"
+                  className="admin-comment-input admin-pl-field"
+                  value={hostCfgRandomMinSongs}
+                  onChange={(e) => setHostCfgRandomMinSongs(Number(e.target.value || 1))}
+                  disabled={hostCfgMode !== 'random'}
+                />
+              </label>
+              <label className="admin-pl-label">
+                Максимум песен
+                <input
+                  type="number"
+                  min="1"
+                  max="20"
+                  step="1"
+                  className="admin-comment-input admin-pl-field"
+                  value={hostCfgRandomMaxSongs}
+                  onChange={(e) => setHostCfgRandomMaxSongs(Number(e.target.value || 1))}
+                  disabled={hostCfgMode !== 'random'}
+                />
+              </label>
+              <div className="admin-pl-form-actions">
+                <button type="submit" className="admin-btn admin-pl-submit" disabled={hostCfgSaving}>
+                  {hostCfgSaving ? 'Сохраняем...' : 'Сохранить настройки'}
+                </button>
+              </div>
+            </form>
           )}
         </div>
       )}
