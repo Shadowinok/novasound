@@ -63,8 +63,8 @@ export default function PlayerBar() {
 
   const volPct = Math.round((volume || 0) * 100);
   const volumeIcon = volPct === 0 ? '🔇' : volPct < 40 ? '🔉' : '🔊';
-  const canPrev = queueIndex > 0 || repeatMode === 'all-repeat';
-  const canNext = queueIndex < (queue.length - 1) || repeatMode === 'all-repeat';
+  const canPrev = !isRadioMode && (queueIndex > 0 || repeatMode === 'all-repeat');
+  const canNext = !isRadioMode && (queueIndex < (queue.length - 1) || repeatMode === 'all-repeat');
   const repeatLabel = repeatMode === 'one'
     ? '1'
     : repeatMode === 'one-repeat'
@@ -134,7 +134,7 @@ export default function PlayerBar() {
               max={maxDuration}
               step={0.01}
               value={sliderValue}
-              disabled={!duration || duration <= 0}
+              disabled={isRadioMode || !duration || duration <= 0}
               onBeforeChange={() => setIsSeeking(true)}
               onChange={(v) => setSeekDraft(Number(v) || 0)}
               onAfterChange={(v) => {
