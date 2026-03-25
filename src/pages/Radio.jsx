@@ -428,7 +428,11 @@ export default function Radio() {
       ttsAudioRef.current = null;
     }
     hostPlayingRef.current = false;
-    const restore = Number(restoreVolumeRef.current);
+    // В момент смены трека `playing` может кратко стать false.
+    // restoreVolumeRef.current тогда часто null → Number(null) == 0 → громкость улетает в 0.
+    const restoreRaw = restoreVolumeRef.current;
+    if (restoreRaw === null || restoreRaw === undefined) return;
+    const restore = Number(restoreRaw);
     if (Number.isFinite(restore)) setPlayerVolume(restore);
   }, [playing, setPlayerVolume]);
 
@@ -437,7 +441,9 @@ export default function Radio() {
       try { ttsAudioRef.current.pause(); } catch (_) {}
       ttsAudioRef.current = null;
     }
-    const restore = Number(restoreVolumeRef.current);
+    const restoreRaw = restoreVolumeRef.current;
+    if (restoreRaw === null || restoreRaw === undefined) return;
+    const restore = Number(restoreRaw);
     if (Number.isFinite(restore)) setPlayerVolume(restore);
   }, [setPlayerVolume]);
 

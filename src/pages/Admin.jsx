@@ -959,6 +959,22 @@ export default function Admin() {
                 />
                 Жесткий интервал (каждые N песен)
               </label>
+              {hostCfgMode === 'fixed' && (
+                <div className="admin-pl-form-actions" style={{ marginTop: 8, marginBottom: 14 }}>
+                  {[2, 3, 4, 5].map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      className="admin-btn admin-pl-submit"
+                      onClick={() => setHostCfgFixedEverySongs(n)}
+                      disabled={hostCfgSaving}
+                      style={{ width: 88 }}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              )}
               <label className="admin-pl-label">
                 N песен
                 <input
@@ -981,6 +997,21 @@ export default function Admin() {
                 />
                 Случайный диапазон (вразнобой)
               </label>
+              {hostCfgMode === 'random' && (
+                <div className="admin-pl-form-actions" style={{ marginTop: 8, marginBottom: 14 }}>
+                  <button
+                    type="button"
+                    className="admin-btn admin-pl-submit"
+                    onClick={() => {
+                      setHostCfgRandomMinSongs(2);
+                      setHostCfgRandomMaxSongs(5);
+                    }}
+                    disabled={hostCfgSaving}
+                  >
+                    2..5
+                  </button>
+                </div>
+              )}
               <label className="admin-pl-label">
                 Минимум песен
                 <input
