@@ -189,6 +189,7 @@ export function PlayerProvider({ children }) {
   }, [normalizeQueue, playQueueTrack]);
 
   const playNext = useCallback(() => {
+    if (isRadioMode) return;
     const q = queueRef.current;
     const idx = queueIndexRef.current;
     if (!q.length) return;
@@ -200,9 +201,10 @@ export function PlayerProvider({ children }) {
     if (repeatModeRef.current === 'all-repeat') {
       playQueueTrack(q[0], q, 0);
     }
-  }, [playQueueTrack]);
+  }, [isRadioMode, playQueueTrack]);
 
   const playPrev = useCallback(() => {
+    if (isRadioMode) return;
     const q = queueRef.current;
     const idx = queueIndexRef.current;
     if (!q.length) return;
@@ -222,7 +224,7 @@ export function PlayerProvider({ children }) {
       const lastIdx = q.length - 1;
       playQueueTrack(q[lastIdx], q, lastIdx);
     }
-  }, [playQueueTrack]);
+  }, [isRadioMode, playQueueTrack]);
 
   const cycleRepeatMode = useCallback(() => {
     if (isRadioMode) return;
@@ -274,6 +276,35 @@ export function PlayerProvider({ children }) {
       setPlaying(false);
       debugLog('pause');
     } else {
+      if (isRadioMode) {
+        tracksApi.radioNow({ limit: 30 })
+          .then(({ data }) => {
+            const now = data?.now || null;
+            const q = Array.isArray(data?.queue) ? data.queue : [];
+            const startAtSec = Number(data?.nowOffsetSec) || 0;
+            if (now && q.length) {
+              loadTrack(now, { queue: q, startIndex: 0, isRadio: true, startAtSec });
+              return;
+            }
+            desiredPlayingRef.current = true;
+            audioRef.current.play()
+              .then(() => setPlaying(true))
+              .catch(() => {
+                desiredPlayingRef.current = false;
+                setPlaying(false);
+              });
+          })
+          .catch(() => {
+            desiredPlayingRef.current = true;
+            audioRef.current.play()
+              .then(() => setPlaying(true))
+              .catch(() => {
+                desiredPlayingRef.current = false;
+                setPlaying(false);
+              });
+          });
+        return;
+      }
       desiredPlayingRef.current = true;
       audioRef.current.play()
         .then(() => {
@@ -286,9 +317,10 @@ export function PlayerProvider({ children }) {
           debugLog('play-failed');
         });
     }
-  }, [debugLog]);
+  }, [debugLog, isRadioMode, loadTrack]);
 
   const seek = useCallback((value) => {
+    if (isRadioMode) return;
     if (!audioRef.current) return;
     const next = Math.max(0, Number(value) || 0);
     audioRef.current.currentTime = next;
@@ -301,7 +333,7 @@ export function PlayerProvider({ children }) {
       setPlaying(false);
     }
     setProgress(next);
-  }, [debugLog]);
+  }, [debugLog, isRadioMode]);
 
   /** Остановить и убрать плеер с экрана */
   const closePlayer = useCallback(() => {
