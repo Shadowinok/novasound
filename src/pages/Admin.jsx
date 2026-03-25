@@ -20,6 +20,15 @@ export default function Admin() {
   const [resolvingReportId, setResolvingReportId] = useState('');
   const [adminComments, setAdminComments] = useState({});
   const [loading, setLoading] = useState(true);
+  const [announcements, setAnnouncements] = useState([]);
+  const [annSaving, setAnnSaving] = useState(false);
+  const [annTitle, setAnnTitle] = useState('');
+  const [annMessageText, setAnnMessageText] = useState('');
+  const [annTrackId, setAnnTrackId] = useState('');
+  const [annPinned, setAnnPinned] = useState(false);
+  const [annPinnedOrder, setAnnPinnedOrder] = useState(100);
+  const [annExpiresAt, setAnnExpiresAt] = useState('');
+  const [annEditingId, setAnnEditingId] = useState(null);
   const [pendingCovers, setPendingCovers] = useState([]);
   const [userSearch, setUserSearch] = useState('');
   const [plTitle, setPlTitle] = useState('');
@@ -66,6 +75,12 @@ export default function Admin() {
       adminApi.trackReports('open')
         .then((r) => setTrackReports(r.data || []))
         .catch(() => setTrackReports([]))
+        .finally(() => setLoading(false));
+    } else if (tab === 'announcements') {
+      adminApi.announcements
+        .list()
+        .then((r) => setAnnouncements(r.data || []))
+        .catch(() => setAnnouncements([]))
         .finally(() => setLoading(false));
     } else {
       adminApi.users().then((r) => setUsers(r.data || [])).catch(() => setUsers([])).finally(() => setLoading(false));
@@ -263,6 +278,99 @@ export default function Admin() {
       .finally(() => setResolvingReportId(''));
   };
 
+  const resetAnnouncementForm = (clearMessages = true) => {
+    setAnnTitle('');
+    setAnnMessageText('');
+    setAnnTrackId('');
+    setAnnPinned(false);
+    setAnnPinnedOrder(100);
+    setAnnExpiresAt('');
+    setAnnEditingId(null);
+    if (clearMessages) setAdminMessage('');
+  };
+
+  const startEditAnnouncement = (a) => {
+    setAdminMessage('');
+    setAnnEditingId(a?._id || null);
+    setAnnTitle(a?.title || '');
+    setAnnMessageText(a?.message || '');
+    setAnnTrackId(a?.trackId ? String(a.trackId) : '');
+    setAnnPinned(!!a?.pinned);
+    setAnnPinnedOrder(Number.isFinite(Number(a?.pinnedOrder)) ? Number(a?.pinnedOrder) : 100);
+    setAnnExpiresAt(a?.expiresAt ? new Date(a.expiresAt).toISOString().slice(0, 16) : '');
+  };
+
+  const upsertAnnouncement = (e) => {
+    e.preventDefault();
+    setAnnSaving(true);
+    setAdminMessage('');
+
+    const title = annTitle.trim();
+    if (!title) {
+      setAdminMessage('Укажите название анонса');
+      setAnnSaving(false);
+      return;
+    }
+
+    const payload = {
+      title,
+      message: annMessageText.trim(),
+      trackId: annTrackId.trim() || null,
+      pinned: annPinned,
+      pinnedOrder: Number.isFinite(Number(annPinnedOrder)) ? Number(annPinnedOrder) : 100,
+      expiresAt: annExpiresAt || null
+    };
+
+    const req = annEditingId ? adminApi.announcements.update(annEditingId, payload) : adminApi.announcements.create(payload);
+    req
+      .then(() => {
+        setAdminMessage(annEditingId ? 'Анонс обновлён' : 'Анонс создан');
+        resetAnnouncementForm(false);
+        adminApi.announcements
+          .list()
+          .then((r) => setAnnouncements(r.data || []))
+          .catch(() => setAnnouncements([]));
+      })
+      .catch((err) => {
+        setAdminMessage(err.response?.data?.message || 'Ошибка сохранения анонса');
+      })
+      .finally(() => setAnnSaving(false));
+  };
+
+  const handleDeleteAnnouncement = (id) => {
+    if (!id) return;
+    // eslint-disable-next-line no-alert
+    if (!window.confirm('Удалить анонс?')) return;
+    setAnnSaving(true);
+    setAdminMessage('');
+    adminApi.announcements
+      .delete(id)
+      .then(() => {
+        setAdminMessage('Анонс удалён');
+        resetAnnouncementForm(false);
+        return adminApi.announcements.list();
+      })
+      .then((r) => setAnnouncements(r.data || []))
+      .catch((err) => setAdminMessage(err.response?.data?.message || 'Не удалось удалить'))
+      .finally(() => setAnnSaving(false));
+  };
+
+  const handleTogglePin = (a) => {
+    if (!a?._id) return;
+    setAnnSaving(true);
+    setAdminMessage('');
+    const nextPinned = !a.pinned;
+    adminApi.announcements
+      .update(a._id, { pinned: nextPinned })
+      .then(() => adminApi.announcements.list())
+      .then((r) => {
+        setAnnouncements(r.data || []);
+        setAdminMessage(nextPinned ? 'Анонс закреплён' : 'Анонс откреплён');
+      })
+      .catch((err) => setAdminMessage(err.response?.data?.message || 'Ошибка pin/unpin'))
+      .finally(() => setAnnSaving(false));
+  };
+
   const filteredUsers = useMemo(() => {
     const list = Array.isArray(users) ? users : [];
     const q = userSearch.trim().toLowerCase();
@@ -290,6 +398,7 @@ export default function Admin() {
         <button type="button" className={tab === 'playlists' ? 'active' : ''} onClick={() => setTab('playlists')}>Плейлисты</button>
         <button type="button" className={tab === 'users' ? 'active' : ''} onClick={() => setTab('users')}>Пользователи</button>
         <button type="button" className={tab === 'reports' ? 'active' : ''} onClick={() => setTab('reports')}>Жалобы на треки</button>
+        <button type="button" className={tab === 'announcements' ? 'active' : ''} onClick={() => setTab('announcements')}>Анонсы</button>
       </div>
       {tab === 'covers' && (
         <>
@@ -666,6 +775,129 @@ export default function Admin() {
           )}
         </div>
       )}
+      {tab === 'announcements' && (
+        <div className="admin-announcements">
+          <p className="admin-hint">Анонсы для главной. Можно закреплять и задавать срок жизни.</p>
+          {adminMessage && <div className="admin-message">{adminMessage}</div>}
+          <form className="admin-playlist-form admin-ann-form" onSubmit={upsertAnnouncement}>
+            <h3 className="admin-playlist-form-title">{annEditingId ? 'Редактировать анонс' : 'Новый анонс'}</h3>
+            <label className="admin-pl-label">
+              Заголовок *
+              <input
+                type="text"
+                className="admin-comment-input admin-pl-field"
+                value={annTitle}
+                onChange={(e) => setAnnTitle(e.target.value)}
+                placeholder="Например: Скоро релиз..."
+                maxLength={200}
+                required
+              />
+            </label>
+            <label className="admin-pl-label">
+              Текст (опционально)
+              <textarea
+                className="admin-comment-input admin-pl-textarea"
+                value={annMessageText}
+                onChange={(e) => setAnnMessageText(e.target.value)}
+                placeholder="Небольшое сообщение для главной (опционально)"
+                rows={3}
+                maxLength={2000}
+              />
+            </label>
+            <label className="admin-pl-label">
+              ID трека (опционально)
+              <input
+                type="text"
+                className="admin-comment-input admin-pl-field"
+                value={annTrackId}
+                onChange={(e) => setAnnTrackId(e.target.value)}
+                placeholder="Например: 664a... (если анонс ведёт на трек)"
+              />
+            </label>
+            <label className="admin-pl-checkbox">
+              <input
+                type="checkbox"
+                checked={annPinned}
+                onChange={(e) => setAnnPinned(e.target.checked)}
+              />
+              Закрепить
+            </label>
+            <label className="admin-pl-label">
+              Приоритет (меньше = выше)
+              <input
+                type="number"
+                min="0"
+                max="9999"
+                step="1"
+                className="admin-comment-input admin-pl-field"
+                value={annPinnedOrder}
+                onChange={(e) => setAnnPinnedOrder(Number(e.target.value || 0))}
+              />
+            </label>
+            <label className="admin-pl-label">
+              Срок жизни (опционально)
+              <input
+                type="datetime-local"
+                className="admin-comment-input admin-pl-field"
+                value={annExpiresAt}
+                onChange={(e) => setAnnExpiresAt(e.target.value)}
+              />
+            </label>
+            <div className="admin-pl-form-actions">
+              <button type="submit" className="admin-btn admin-pl-submit" disabled={annSaving}>
+                {annSaving ? 'Сохраняем...' : annEditingId ? 'Сохранить' : 'Создать'}
+              </button>
+              {annEditingId && (
+                <button type="button" className="admin-btn admin-pl-cancel" onClick={() => resetAnnouncementForm()}>
+                  Отмена
+                </button>
+              )}
+            </div>
+          </form>
+          {loading ? (
+            <div className="loading">Загрузка...</div>
+          ) : announcements.length === 0 ? (
+            <div className="empty">Анонсов пока нет</div>
+          ) : (
+            <div className="admin-ann-grid">
+              {announcements.map((a) => (
+                <div key={a._id} className="admin-ann-card">
+                  <div className="admin-ann-card-top">
+                    <div className="admin-ann-card-title">{a.title}</div>
+                    <div className="admin-ann-meta">
+                      {a.pinned ? <span className="admin-ann-badge home">Закреплён</span> : <span className="admin-ann-badge">Обычный</span>}
+                      {a.createdBy?.username ? <span className="admin-ann-badge">Автор: {a.createdBy.username}</span> : null}
+                      {a.expiresAt ? <span className="admin-ann-badge">До: {new Date(a.expiresAt).toLocaleString()}</span> : null}
+                    </div>
+                  </div>
+                  {!!a.message && <div className="admin-ann-card-message">{a.message}</div>}
+                  <div className="admin-ann-actions">
+                    <button type="button" className="admin-btn admin-pl-edit" onClick={() => startEditAnnouncement(a)} disabled={annSaving}>
+                      Редактировать
+                    </button>
+                    <button
+                      type="button"
+                      className="admin-btn admin-pl-feature"
+                      onClick={() => handleTogglePin(a)}
+                      disabled={annSaving}
+                    >
+                      {a.pinned ? 'Открепить' : 'Закрепить'}
+                    </button>
+                    <button
+                      type="button"
+                      className="admin-btn reject"
+                      onClick={() => handleDeleteAnnouncement(a._id)}
+                      disabled={annSaving}
+                    >
+                      Удалить
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       <style>{`
         .page-title { color: var(--neon-cyan); margin-bottom: 24px; }
         .admin-page {
@@ -964,6 +1196,43 @@ export default function Admin() {
           resize: vertical;
         }
         .rep-actions { display: flex; flex-direction: column; gap: 8px; }
+
+        .admin-announcements { margin-top: 8px; }
+        .admin-ann-form { max-width: 620px; margin-bottom: 22px; }
+        .admin-ann-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+          gap: 16px;
+        }
+        .admin-ann-card {
+          border: 1px solid rgba(5, 217, 232, 0.22);
+          background: rgba(0,0,0,0.18);
+          border-radius: 12px;
+          padding: 12px;
+        }
+        .admin-ann-card-top { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+        .admin-ann-card-title { color: var(--neon-cyan); font-weight: 650; font-size: 1rem; }
+        .admin-ann-meta { display: flex; flex-wrap: wrap; gap: 8px; }
+        .admin-ann-badge {
+          font-size: 0.78rem;
+          padding: 2px 8px;
+          border-radius: 999px;
+          border: 1px solid rgba(255, 200, 0, 0.3);
+          color: var(--text-dim);
+        }
+        .admin-ann-badge.home {
+          border-color: rgba(255, 200, 0, 0.45);
+          color: #ffd65a;
+        }
+        .admin-ann-card-message {
+          color: var(--text-dim);
+          font-size: 0.9rem;
+          margin-bottom: 10px;
+          white-space: pre-wrap;
+        }
+        .admin-ann-actions { display: flex; gap: 8px; }
+        .admin-ann-actions .admin-btn { flex: 1; }
+
         @media (max-width: 900px) {
           .admin-page { padding-left: 0; padding-right: 0; }
         }

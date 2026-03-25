@@ -47,23 +47,30 @@ export default function Home() {
           <h3 className="section-title">Анонсы</h3>
           <div className="announcements-list">
             {announcements.map((a) => (
-              <Link
-                key={`${a.kind}-${String(a.trackId || '')}`}
-                to={`/track/${a.trackId}`}
-                className={`announcement-item ${a.kind === 'radio' ? 'announcement-item--radio' : ''}`}
-              >
-                {a.kind === 'radio' ? (
-                  <>
-                    <span className="announcement-kind">В эфире</span>
-                    <span className="announcement-title">{a.title}</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="announcement-kind">Новинка</span>
-                    <span className="announcement-title">{a.title}</span>
-                  </>
-                )}
-              </Link>
+              a.trackId ? (
+                <Link
+                  key={`${a.kind}-${a.announcementId || a._id || a.trackId || ''}`}
+                  to={`/track/${a.trackId}`}
+                  className={`announcement-item ${a.kind === 'radio' ? 'announcement-item--radio' : ''}`}
+                >
+                  <span className="announcement-kind">
+                    {a.kind === 'radio' ? 'В эфире' : a.kind === 'announcement' ? 'Анонс' : 'Новинка'}
+                  </span>
+                  <span className="announcement-title">{a.title}</span>
+                  {!!a.message && <span className="announcement-message">{String(a.message).slice(0, 120)}</span>}
+                </Link>
+              ) : (
+                <div
+                  key={`${a.kind}-${a.announcementId || a._id || ''}`}
+                  className={`announcement-item ${a.kind === 'radio' ? 'announcement-item--radio' : ''}`}
+                >
+                  <span className="announcement-kind">
+                    {a.kind === 'radio' ? 'В эфире' : a.kind === 'announcement' ? 'Анонс' : 'Новинка'}
+                  </span>
+                  <span className="announcement-title">{a.title}</span>
+                  {!!a.message && <span className="announcement-message">{String(a.message).slice(0, 120)}</span>}
+                </div>
+              )
             ))}
           </div>
         </section>
@@ -225,6 +232,11 @@ export default function Home() {
           font-family: var(--font-display);
           color: var(--neon-cyan);
           font-size: 0.95rem;
+        }
+        .announcement-message {
+          font-size: 0.82rem;
+          color: var(--text-dim);
+          margin-top: 2px;
         }
       `}</style>
     </motion.div>
