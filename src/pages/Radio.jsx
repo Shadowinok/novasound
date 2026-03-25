@@ -261,7 +261,6 @@ export default function Radio() {
     const fallbackBestTitle = String(djEpisode?.tag || nextTrack.title || 'следующая песня');
     const bestTitle = String(best?.title || fallbackBestTitle);
     if (!bestTitle.trim()) return;
-    lastSpokenKeyRef.current = trackKey;
 
     const langHint = detectLangHint(bestTitle);
     const langAvailable = langHint ? hasVoiceForLang(langHint.langCode) : false;
@@ -408,8 +407,8 @@ export default function Radio() {
 
     let episodeLine = '';
     const epId = djEpisode?.id ? String(djEpisode.id) : '';
-    if (epId && lastEpisodeAnnouncedRef.current !== epId) {
-      lastEpisodeAnnouncedRef.current = epId;
+    const shouldAnnounceEpisode = epId && lastEpisodeAnnouncedRef.current !== epId;
+    if (shouldAnnounceEpisode) {
       episodeLine = buildEpisodeLine(djEpisode);
     }
 
@@ -436,11 +435,19 @@ export default function Radio() {
       restoreVolumeRef.current = Number(volume);
       const lowered = Math.max(0.16, Number(volume) * 0.28);
       setPlayerVolume(lowered);
+      let playedLines = 0;
       // Говорим последовательно: ждём завершения каждой строки.
       // eslint-disable-next-line no-restricted-syntax
       for (const line of scriptLines) {
         // eslint-disable-next-line no-await-in-loop
-        await speakLine(line);
+        const ok = await speakLine(line);
+        if (ok) playedLines += 1;
+      }
+      if (playedLines > 0) {
+        lastSpokenKeyRef.current = trackKey;
+        if (shouldAnnounceEpisode) {
+          lastEpisodeAnnouncedRef.current = epId;
+        }
       }
       hostLastAtRef.current = Date.now();
       if (best?.title) {
