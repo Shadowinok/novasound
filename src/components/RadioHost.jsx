@@ -5,6 +5,8 @@ import { usePlayer } from '../context/PlayerContext';
 /**
  * Ведущий радио: должен жить в Layout, а не на странице /radio —
  * иначе при уходе со страницы логика размонтируется и TTS не вызывается.
+ *
+ * React Strict Mode лишь в dev может дважды монтировать компоненты; production-сборка ведёт себя как один mount.
  */
 export default function RadioHost() {
   const {
@@ -13,8 +15,8 @@ export default function RadioHost() {
     queueIndex,
     isRadioMode,
     playing,
-    volume,
-    setPlayerVolume
+    applyMusicDuck,
+    releaseMusicDuck
   } = usePlayer();
 
   const [hostNews, setHostNews] = useState([]);
@@ -32,8 +34,9 @@ export default function RadioHost() {
   const lastEpisodeAnnouncedRef = useRef('');
   const ttsAudioRef = useRef(null);
   const hostPlayingRef = useRef(false);
-  const restoreVolumeRef = useRef(null);
   const spokenTitlesRef = useRef([]);
+  /** Музыка тише голоса ведущего (только gain элемента Audio; ползунок — громкость пользователя) */
+  const DUCK_MUSIC_FACTOR = 0.09;
   const hostTrackCounterRef = useRef(0);
   const lastCountedSlotKeyRef = useRef('');
   const hostNextAfterTracksRef = useRef(2);
@@ -130,10 +133,10 @@ export default function RadioHost() {
 
   const detectLangHint = (text) => {
     const t = String(text || '').toLowerCase();
-    if (t.includes('чуваш')) return { label: 'чувашском', langCode: 'cv-RU' };
-    if (t.includes('татар')) return { label: 'татарском', langCode: 'tt-RU' };
-    if (t.includes('удмурт')) return { label: 'удмуртском', langCode: 'ud-RU' };
-    if (t.includes('англий')) return { label: 'английском', langCode: 'en-US' };
+    if (t.includes('чуваш')) return { label: 'чувашском' };
+    if (t.includes('татар')) return { label: 'татарском' };
+    if (t.includes('удмурт')) return { label: 'удмуртском' };
+    if (t.includes('англий')) return { label: 'английском' };
     return null;
   };
 
@@ -221,6 +224,8 @@ export default function RadioHost() {
     if (!trackKey) return;
     if (lastSpokenKeyRef.current === trackKey && hostPlayingRef.current) return;
 
+    let episodeForSpeak = djEpisode;
+
     let effectiveNext =
       isRadioMode && Array.isArray(queue) && queue.length > queueIndex + 1
         ? queue[queueIndex + 1]
@@ -228,8 +233,17 @@ export default function RadioHost() {
     if (!effectiveNext) {
       try {
         const { data } = await tracksApi.radioNow({ limit: 30 });
+        const serverNowId = data?.now?._id != null ? String(data.now._id) : '';
+        // Не подставляем «следующий» из чужого снимка эфира, если сервер уже на другом треке
+        if (!currentTrackId || serverNowId !== currentTrackId) {
+          return;
+        }
+        if (data && Object.prototype.hasOwnProperty.call(data, 'djEpisode')) {
+          episodeForSpeak = data.djEpisode || null;
+          setDjEpisode(data.djEpisode || null);
+        }
         const q = Array.isArray(data?.queue) ? data.queue : [];
-        const idx = currentTrackId ? q.findIndex((t) => String(t?._id) === currentTrackId) : -1;
+        const idx = q.findIndex((t) => String(t?._id) === currentTrackId);
         if (idx >= 0 && idx + 1 < q.length) {
           effectiveNext = q[idx + 1];
         } else if (Array.isArray(data?.next) && data.next[0]) {
@@ -333,6 +347,7 @@ export default function RadioHost() {
 
     const kind = introTemplates[kindCandidate] ? kindCandidate : 'generic';
 
+    /* Варианты фраз — общий тон и стиль, не «сценарий из БД» */
     const metaTemplates = [
       'Короче, я ИИ-ведущий. Дальше — объявление следующей песни.',
       'Не пугайтесь: это ИИ-ведущий. Сейчас будет анонс следующего трека.',
@@ -392,10 +407,10 @@ export default function RadioHost() {
     };
 
     let episodeLine = '';
-    const epId = djEpisode?.id ? String(djEpisode.id) : '';
+    const epId = episodeForSpeak?.id ? String(episodeForSpeak.id) : '';
     const shouldAnnounceEpisode = epId && lastEpisodeAnnouncedRef.current !== epId;
     if (shouldAnnounceEpisode) {
-      episodeLine = buildEpisodeLine(djEpisode);
+      episodeLine = buildEpisodeLine(episodeForSpeak);
     }
 
     const scriptLines = episodeLine ? [episodeLine, intro, meta] : [intro, joke, meta];
@@ -413,9 +428,7 @@ export default function RadioHost() {
     try {
       if (hostPlayingRef.current) return;
       hostPlayingRef.current = true;
-      restoreVolumeRef.current = Number(volume);
-      const lowered = Math.max(0.16, Number(volume) * 0.28);
-      setPlayerVolume(lowered);
+      applyMusicDuck(DUCK_MUSIC_FACTOR);
       let playedLines = 0;
       // eslint-disable-next-line no-restricted-syntax
       for (const line of scriptLines) {
@@ -436,12 +449,12 @@ export default function RadioHost() {
     } catch (_) {
       // TTS недоступен
     } finally {
-      const restore = Number(restoreVolumeRef.current);
-      if (Number.isFinite(restore)) setPlayerVolume(restore);
+      releaseMusicDuck();
       hostPlayingRef.current = false;
     }
   }, [
     activeNow,
+    applyMusicDuck,
     hostCandidates,
     isRadioMode,
     playing,
@@ -449,9 +462,9 @@ export default function RadioHost() {
     playbackSlotKey,
     queue,
     queueIndex,
-    setPlayerVolume,
-    volume,
-    djEpisode
+    releaseMusicDuck,
+    djEpisode,
+    setDjEpisode
   ]);
 
   useEffect(() => {
@@ -480,22 +493,16 @@ export default function RadioHost() {
       ttsAudioRef.current = null;
     }
     hostPlayingRef.current = false;
-    const restoreRaw = restoreVolumeRef.current;
-    if (restoreRaw === null || restoreRaw === undefined) return;
-    const restore = Number(restoreRaw);
-    if (Number.isFinite(restore)) setPlayerVolume(restore);
-  }, [playing, setPlayerVolume]);
+    releaseMusicDuck();
+  }, [playing, releaseMusicDuck]);
 
   useEffect(() => () => {
     if (ttsAudioRef.current) {
       try { ttsAudioRef.current.pause(); } catch (_) {}
       ttsAudioRef.current = null;
     }
-    const restoreRaw = restoreVolumeRef.current;
-    if (restoreRaw === null || restoreRaw === undefined) return;
-    const restore = Number(restoreRaw);
-    if (Number.isFinite(restore)) setPlayerVolume(restore);
-  }, [setPlayerVolume]);
+    releaseMusicDuck();
+  }, [releaseMusicDuck]);
 
   return null;
 }
