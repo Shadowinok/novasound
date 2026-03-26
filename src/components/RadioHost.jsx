@@ -137,8 +137,7 @@ export default function RadioHost() {
       'industry-news',
       'software-news',
       'robots-news',
-      'releases-news',
-      'announcement'
+      'releases-news'
     ]);
     return items.filter((it) => allowedKinds.has(it?.kind) && !!it?.title);
   }, [hostNews]);
@@ -534,9 +533,6 @@ export default function RadioHost() {
     };
     const pickFormat = () => {
       if (forceFormat) return forceFormat;
-      const now = Date.now();
-      const canNewsBlock = hostCandidates.length > 0 && (now - lastNewsBlockAtRef.current) >= (60 * 60 * 1000);
-      if (canNewsBlock && chance(0.65)) return 'news-block';
       const roll = Math.random();
       if (roll < 0.55) return 'track-intro';
       if (roll < 0.8) return 'light-talk';
@@ -721,7 +717,7 @@ export default function RadioHost() {
         window.clearTimeout(speakScheduleTimerRef.current);
         speakScheduleTimerRef.current = null;
       }
-      void speakHostForTrack({ forceFormat: 'news-block', duckFactor: 0.02 });
+      void speakHostForTrack({ forceFormat: 'news-block', duckFactor: 0 });
     }, 1000);
     return () => window.clearInterval(timer);
   }, [isRadioMode, playing, speakHostForTrack]);
