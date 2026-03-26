@@ -273,6 +273,39 @@ export function PlayerProvider({ children }) {
     });
   }, [normalizeQueue, playQueueTrack]);
 
+  /** Для "честного" брейка между треками: после речи ведущего перейти на следующий радио-трек. */
+  const advanceRadioAfterHost = useCallback(async (currentTrackId = '') => {
+    if (!isRadioModeRef.current) return false;
+    const token = localStorage.getItem('novasound_token');
+    const isRadioPublic = !token;
+    try {
+      const { data } = await tracksApi.radioNow({ limit: 30 });
+      const now = data?.now || null;
+      const q = Array.isArray(data?.queue) ? data.queue : [];
+      if (!q.length) return false;
+
+      const currentId = currentTrackId ? String(currentTrackId) : '';
+      let serverIdx = q.findIndex((t) => String(t?._id) === String(now?._id || ''));
+      if (serverIdx < 0) serverIdx = 0;
+
+      let nextIdx = serverIdx;
+      if (currentId) {
+        const currentIdxInQueue = q.findIndex((t) => String(t?._id) === currentId);
+        if (currentIdxInQueue >= 0 && currentIdxInQueue + 1 < q.length) {
+          nextIdx = currentIdxInQueue + 1;
+        } else if (String(q[serverIdx]?._id || '') === currentId && q.length > 1) {
+          nextIdx = (serverIdx + 1) % q.length;
+        }
+      }
+
+      const startAtSec = nextIdx === serverIdx ? (Number(data?.nowOffsetSec) || 0) : 0;
+      playQueueTrack(q[nextIdx] || now || q[0], q, Math.max(0, nextIdx), { startAtSec, isRadioPublic });
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }, [playQueueTrack]);
+
   const playNext = useCallback(() => {
     if (isRadioMode) return;
     const q = queueRef.current;
@@ -497,6 +530,7 @@ export function PlayerProvider({ children }) {
       resumeAfterHost,
       applyMusicDuck,
       releaseMusicDuck,
+      advanceRadioAfterHost,
       setProgress,
       setDuration,
       closePlayer
