@@ -9,6 +9,7 @@ import { usePlayer } from '../context/PlayerContext';
  * React Strict Mode лишь в dev может дважды монтировать компоненты; production-сборка ведёт себя как один mount.
  */
 export default function RadioHost() {
+  const DJ_NAME = 'ДИДЖЕЙ И-И';
   const {
     currentTrack,
     queue,
@@ -280,6 +281,9 @@ export default function RadioHost() {
       const master = ctx.createGain();
       master.gain.value = 0.0001;
       master.connect(ctx.destination);
+      if (ctx.state === 'suspended') {
+        try { ctx.resume(); } catch (_) {}
+      }
 
       const pulse = (baseFreq = 392) => {
         const t0 = ctx.currentTime;
@@ -294,7 +298,7 @@ export default function RadioHost() {
           g.connect(master);
           const startAt = t0 + (idx * 0.06);
           g.gain.setValueAtTime(0.0001, startAt);
-          g.gain.linearRampToValueAtTime(0.012, startAt + 0.05);
+          g.gain.linearRampToValueAtTime(0.025, startAt + 0.05);
           g.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.45);
           osc.start(startAt);
           osc.stop(startAt + 0.5);
@@ -306,7 +310,7 @@ export default function RadioHost() {
       newsBedMasterGainRef.current = master;
       const now = ctx.currentTime;
       master.gain.cancelScheduledValues(now);
-      master.gain.linearRampToValueAtTime(0.045, now + 0.8);
+      master.gain.linearRampToValueAtTime(0.095, now + 0.6);
       pulse(392);
       newsBedPulseTimerRef.current = window.setInterval(() => {
         pulse(Math.random() < 0.5 ? 392 : 440);
@@ -451,12 +455,12 @@ export default function RadioHost() {
       ]);
     const announceWithDjLead = chance(0.24);
     const djSelfTemplates = [
-      'С вами ДИДЖЕЙ ИИ.',
-      'У микрофона ваш ДИДЖЕЙ ИИ.',
-      'Как всегда на связи ваш ДИДЖЕЙ ИИ.',
-      'В эфире ваш ДИДЖЕЙ ИИ.',
-      'На волне снова ДИДЖЕЙ ИИ.',
-      'ДИДЖЕЙ ИИ в эфире, продолжаем.'
+      `С вами ${DJ_NAME}.`,
+      `У микрофона ваш ${DJ_NAME}.`,
+      `Как всегда на связи ваш ${DJ_NAME}.`,
+      `В эфире ваш ${DJ_NAME}.`,
+      `На волне снова ${DJ_NAME}.`,
+      `${DJ_NAME} в эфире, продолжаем.`
     ];
 
     const trackLeadFutureTemplates = [
@@ -689,10 +693,10 @@ export default function RadioHost() {
       lastNewsBlockAtRef.current = Date.now();
       lastFormatRef.current = 'news-block';
       scriptLines.push(randPick([
-        'Всем привет, с вами ДИДЖЕЙ ИИ.',
-        'И как всегда с вами ДИДЖЕЙ ИИ, привет.',
-        'Привет, у микрофона ваш ДИДЖЕЙ ИИ.',
-        'На связи ДИДЖЕЙ ИИ, всем привет.'
+        `Всем привет, с вами ${DJ_NAME}.`,
+        `И как всегда с вами ${DJ_NAME}, привет.`,
+        `Привет, у микрофона ваш ${DJ_NAME}.`,
+        `На связи ${DJ_NAME}, всем привет.`
       ]));
       scriptLines.push(buildDatePhrase());
       scriptLines.push(buildWeatherPhrase());
@@ -705,20 +709,35 @@ export default function RadioHost() {
       if (newsItemsForBlock.length) {
         scriptLines.push(`Поехали по актуальному. Новость первая: “${newsItemsForBlock[0]}”.`);
         newsItemsForBlock.slice(1).forEach((title, idx) => {
+          const bridgeTemplates = [
+            `Дальше по ленте: “${title}”.`,
+            `Ещё заголовок в эфир: “${title}”.`,
+            `Переключаемся на следующую тему: “${title}”.`,
+            `Из свежего также: “${title}”.`,
+            `Лента добавляет ещё пункт: “${title}”.`,
+            `Идём дальше, вот что ещё: “${title}”.`,
+            `Коротко о следующем: “${title}”.`,
+            `Следующий инфо-штрих: “${title}”.`
+          ];
           const line = idx === newsItemsForBlock.length - 2
-            ? `И ещё из ленты: “${title}”.`
-            : `Следом новость: “${title}”.`;
+            ? `И под финал новостного блока: “${title}”.`
+            : randPick(bridgeTemplates);
           scriptLines.push(line);
         });
       } else {
         scriptLines.push(`В ленте обсуждают: “${newsTitle}”.`);
       }
       scriptLines.push(newsCommentaryBuild());
-      scriptLines.push(randPick([
+      const postNewsOutroTemplates = [
         'Это был новостной блок, а теперь возвращаемся к музыке.',
-        'На этом с новостями всё, продолжаем эфир.',
-        'Новости на паузу, треки на максимум.'
-      ]));
+        'На этом с новостями всё, продолжаем музыкальный эфир.',
+        'Новости на паузу, треки на максимум.',
+        'Инфо-часть завершили, дальше снова чистый музыкальный поток.',
+        'Новостной дайджест закрыт, переходим обратно в ритм эфира.',
+        'С новостями разобрались, продолжаем наш музыкальный маршрут.',
+        'Информационный блок завершён, дальше только музыка и настроение.'
+      ];
+      scriptLines.push(randPick(postNewsOutroTemplates));
       if (chance(0.45)) scriptLines.push(randPick(shortIronicFacts));
       if (announceWithDjLead) scriptLines.push(randPick(djSelfTemplates));
       scriptLines.push(wrapWithFreshTrack(randPick(trackLeadFutureTemplates)));
@@ -928,7 +947,7 @@ export default function RadioHost() {
         window.clearTimeout(speakScheduleTimerRef.current);
         speakScheduleTimerRef.current = null;
       }
-      void speakHostForTrack({ forceFormat: 'news-block', duckFactor: 0 });
+      void speakHostForTrack({ forceFormat: 'news-block', duckFactor: 0, pauseMusic: true });
     }, 1000);
     return () => window.clearInterval(timer);
   }, [isRadioMode, playing, speakHostForTrack]);
