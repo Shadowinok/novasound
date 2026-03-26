@@ -20,6 +20,9 @@ export function PlayerProvider({ children }) {
     return 1;
   });
   const audioRef = useRef(null);
+  /** 1 = норма; меньше 1 — только выход громкости элемента Audio (ползунок и volume в state не меняем) */
+  const musicDuckMultiplierRef = useRef(1);
+  const volumeRef = useRef(volume);
   const isRadioModeRef = useRef(false);
   const queueRef = useRef([]);
   const queueIndexRef = useRef(0);
@@ -27,6 +30,10 @@ export function PlayerProvider({ children }) {
   const desiredPlayingRef = useRef(false);
   const radioAutoResumeCooldownRef = useRef(0);
   const playerDebugRef = useRef(localStorage.getItem('novasound_player_debug') === '1');
+
+  useEffect(() => {
+    volumeRef.current = volume;
+  }, [volume]);
 
   const debugLog = useCallback((event, payload = {}) => {
     if (!playerDebugRef.current) return;
@@ -40,6 +47,7 @@ export function PlayerProvider({ children }) {
     audioRef.current.src = '';
     audioRef.current.load();
     audioRef.current = null;
+    musicDuckMultiplierRef.current = 1;
   }, []);
 
   const resetPlayerState = useCallback(() => {
@@ -55,6 +63,7 @@ export function PlayerProvider({ children }) {
     isRadioModeRef.current = false;
     queueRef.current = [];
     queueIndexRef.current = 0;
+    musicDuckMultiplierRef.current = 1;
   }, []);
 
   const normalizeQueue = useCallback((list, fallbackTrack) => {
@@ -77,7 +86,11 @@ export function PlayerProvider({ children }) {
     const audio = new Audio(url);
     audio.preload = 'auto';
     audio.crossOrigin = 'anonymous';
-    audio.volume = volume;
+    {
+      const v = volumeRef.current;
+      const m = musicDuckMultiplierRef.current;
+      audio.volume = Math.min(1, v * m);
+    }
 
     const startAtSec = Number(opts.startAtSec);
     let startApplied = false;
@@ -212,7 +225,7 @@ export function PlayerProvider({ children }) {
       debugLog('play-failed', { trackId: track._id });
     });
     tracksApi.play(track._id).catch(() => {});
-  }, [debugLog, normalizeQueue, releaseAudio, resetPlayerState, volume]);
+  }, [debugLog, normalizeQueue, releaseAudio, resetPlayerState]);
 
   const loadTrack = useCallback((track, options = {}) => {
     if (!track) {
@@ -307,8 +320,29 @@ export function PlayerProvider({ children }) {
   const setPlayerVolume = useCallback((nextVolume) => {
     const v = Math.max(0, Math.min(1, Number(nextVolume) || 0));
     setVolume(v);
+    volumeRef.current = v;
     localStorage.setItem('novasound_volume', String(v));
-    if (audioRef.current) audioRef.current.volume = v;
+    if (audioRef.current) {
+      const m = musicDuckMultiplierRef.current;
+      audioRef.current.volume = Math.min(1, v * m);
+    }
+  }, []);
+
+  /** Приглушить только музыку (ведущий / наложения); ползунок и сохранённая громкость — громкость пользователя */
+  const applyMusicDuck = useCallback((multiplier) => {
+    const m = Math.max(0, Math.min(1, Number(multiplier)));
+    musicDuckMultiplierRef.current = m;
+    if (audioRef.current) {
+      const v = volumeRef.current;
+      audioRef.current.volume = Math.min(1, v * m);
+    }
+  }, []);
+
+  const releaseMusicDuck = useCallback(() => {
+    musicDuckMultiplierRef.current = 1;
+    if (audioRef.current) {
+      audioRef.current.volume = volumeRef.current;
+    }
   }, []);
 
   const togglePlay = useCallback(() => {
@@ -407,6 +441,8 @@ export function PlayerProvider({ children }) {
       cycleRepeatMode,
       seek,
       setPlayerVolume,
+      applyMusicDuck,
+      releaseMusicDuck,
       setProgress,
       setDuration,
       closePlayer
