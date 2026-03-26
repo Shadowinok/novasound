@@ -1,116 +1,65 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { tracks as tracksApi, getPublicAudioUrl } from '../api/client';
+import React, { useCallback, useMemo, useState } from 'react';
+import { tracks as tracksApi } from '../api/client';
+import { usePlayer } from '../context/PlayerContext';
 
 export default function GuestRadioMiniPlayer() {
-  const audioRef = useRef(null);
-  const [queue, setQueue] = useState([]);
-  const [current, setCurrent] = useState(null);
-  const [playing, setPlaying] = useState(false);
+  const {
+    currentTrack,
+    playing,
+    progress,
+    buffered,
+    duration,
+    isRadioMode,
+    togglePlay: toggleMainPlay,
+    loadTrack
+  } = usePlayer();
   const [loading, setLoading] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [buffered, setBuffered] = useState(0);
 
   const fetchRadioNow = useCallback(async () => {
     const { data } = await tracksApi.radioNow({ limit: 20 });
     const q = Array.isArray(data?.queue) ? data.queue : [];
     const now = data?.now || q[0] || null;
-    return { now, queue: q, startAtSec: Number(data?.nowOffsetSec) || 0 };
+    let idx = q.findIndex((t) => String(t?._id) === String(now?._id));
+    if (idx < 0) idx = 0;
+    return { now, queue: q, queueIndex: idx, startAtSec: Number(data?.nowOffsetSec) || 0 };
   }, []);
 
-  const playTrack = useCallback((track, startAtSec = 0) => {
-    if (!track) return false;
-    const url = getPublicAudioUrl(track);
-    if (!url) return false;
-    if (audioRef.current) {
-      try { audioRef.current.pause(); } catch (_) {}
-      audioRef.current.src = '';
-    }
-    const a = new Audio(url);
-    a.preload = 'auto';
-    a.crossOrigin = 'anonymous';
-    a.volume = 0.9;
-    a.addEventListener('loadedmetadata', () => {
-      const d = Number(a.duration);
-      if (Number.isFinite(d)) setDuration(d);
-      const target = Math.max(0, Number(startAtSec) || 0);
-      if (target > 0 && Number.isFinite(d) && d > 2) {
-        try { a.currentTime = Math.min(target, d - 1); } catch (_) {}
-      }
-    });
-    a.addEventListener('timeupdate', () => setProgress(Number(a.currentTime) || 0));
-    a.addEventListener('progress', () => {
-      try {
-        if (a.buffered.length > 0) {
-          const end = Number(a.buffered.end(a.buffered.length - 1));
-          if (Number.isFinite(end)) setBuffered(end);
-        }
-      } catch (_) {}
-    });
-    a.addEventListener('play', () => setPlaying(true));
-    a.addEventListener('pause', () => setPlaying(false));
-    a.addEventListener('waiting', () => setLoading(true));
-    a.addEventListener('canplay', () => setLoading(false));
-    a.addEventListener('ended', async () => {
-      setLoading(true);
-      try {
-        const snap = await fetchRadioNow();
-        setQueue(snap.queue);
-        setCurrent(snap.now);
-        playTrack(snap.now, snap.startAtSec);
-      } catch (_) {
-        setPlaying(false);
-      } finally {
-        setLoading(false);
-      }
-    });
-    audioRef.current = a;
-    setCurrent(track);
-    setProgress(0);
-    setBuffered(0);
-    setDuration(Number(track.duration) || 0);
-    a.play()
-      .then(() => setPlaying(true))
-      .catch(() => setPlaying(false));
-    return true;
-  }, [fetchRadioNow]);
-
-  const togglePlay = useCallback(async () => {
-    if (audioRef.current) {
+  const toggleGuestPlay = useCallback(async () => {
+    if (isRadioMode && currentTrack) {
       if (playing) {
-        audioRef.current.pause();
+        toggleMainPlay();
       } else {
-        const p = audioRef.current.play();
-        if (p && typeof p.catch === 'function') p.catch(() => {});
+        toggleMainPlay();
       }
       return;
     }
     setLoading(true);
     try {
       const snap = await fetchRadioNow();
-      setQueue(snap.queue);
-      playTrack(snap.now, snap.startAtSec);
+      if (snap.now && snap.queue.length) {
+        loadTrack(snap.now, {
+          queue: snap.queue,
+          startIndex: snap.queueIndex,
+          isRadio: true,
+          isRadioPublic: true,
+          startAtSec: snap.startAtSec
+        });
+      }
     } catch (_) {
-      setPlaying(false);
+      // ignore
     } finally {
       setLoading(false);
     }
-  }, [fetchRadioNow, playTrack, playing]);
+  }, [currentTrack, fetchRadioNow, isRadioMode, loadTrack, playing, toggleMainPlay]);
 
-  useEffect(() => () => {
-    if (!audioRef.current) return;
-    try { audioRef.current.pause(); } catch (_) {}
-    audioRef.current.src = '';
-  }, []);
-
-  const title = useMemo(() => String(current?.title || 'Радио'), [current]);
+  const title = useMemo(() => String(currentTrack?.title || 'Радио'), [currentTrack]);
   const max = duration > 0 ? duration : 1;
   const playedPct = Math.max(0, Math.min(100, (progress / max) * 100));
   const loadedPct = Math.max(0, Math.min(100, (buffered / max) * 100));
 
   return (
     <div className="guest-mini-player" aria-label="Мини-плеер радио">
-      <button type="button" className="guest-mini-player__btn" onClick={togglePlay} aria-label="Плей пауза">
+      <button type="button" className="guest-mini-player__btn" onClick={toggleGuestPlay} aria-label="Плей пауза">
         {playing ? '❚❚' : '▶'}
       </button>
       <div className="guest-mini-player__progress">
