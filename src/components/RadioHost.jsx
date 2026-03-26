@@ -363,8 +363,10 @@ export default function RadioHost() {
 
     const spoken = spokenTitlesRef.current;
     let best = null;
+    let newsPool = [];
     if (hostCandidates.length) {
       const sorted = [...hostCandidates].sort((a, b) => scoreHostTitle(b.title) - scoreHostTitle(a.title));
+      newsPool = sorted;
       best = sorted.find((x) => {
         const title = String(x?.title || '');
         return title && !spoken.includes(title);
@@ -429,6 +431,10 @@ export default function RadioHost() {
       `Новости шепнули: “${newsTitle}”. Уровень драмы приличный, берём в эфир.`,
       `Поймал заголовок: “${newsTitle}”. Комментарий один: красиво сказано.`
     ];
+    const newsItemsForBlock = newsPool
+      .filter((x) => String(x?.title || '').trim())
+      .slice(0, 5)
+      .map((x) => String(x.title).slice(0, 140));
     const shortIronicFacts = [
       'Интересный факт: будильник всегда звонит на самом интересном месте сна.',
       'Маленькое наблюдение: очередь в магазине двигается быстрее в соседней кассе.',
@@ -575,7 +581,17 @@ export default function RadioHost() {
         'И у нас новостной блок.',
         'Переходим в блок новостей.'
       ]));
-      scriptLines.push(`В ленте обсуждают: “${newsTitle}”.`);
+      if (newsItemsForBlock.length) {
+        scriptLines.push(`Поехали по актуальному. Новость первая: “${newsItemsForBlock[0]}”.`);
+        newsItemsForBlock.slice(1).forEach((title, idx) => {
+          const line = idx === newsItemsForBlock.length - 2
+            ? `И ещё из ленты: “${title}”.`
+            : `Следом новость: “${title}”.`;
+          scriptLines.push(line);
+        });
+      } else {
+        scriptLines.push(`В ленте обсуждают: “${newsTitle}”.`);
+      }
       scriptLines.push(randPick([
         'Это был новостной блок, а теперь возвращаемся к музыке.',
         'На этом с новостями всё, продолжаем эфир.',
@@ -627,8 +643,11 @@ export default function RadioHost() {
           lastEpisodeAnnouncedRef.current = epId;
         }
       }
-      if (best?.title) {
-        const nextSpoken = [...spokenTitlesRef.current, String(best.title || '')].slice(-10);
+      if (newsItemsForBlock.length) {
+        const nextSpoken = [...spokenTitlesRef.current, ...newsItemsForBlock].slice(-12);
+        spokenTitlesRef.current = nextSpoken;
+      } else if (best?.title) {
+        const nextSpoken = [...spokenTitlesRef.current, String(best.title || '')].slice(-12);
         spokenTitlesRef.current = nextSpoken;
       }
     } catch (_) {
