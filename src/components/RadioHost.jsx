@@ -49,6 +49,7 @@ export default function RadioHost() {
   const newsBedCtxRef = useRef(null);
   const newsBedMasterGainRef = useRef(null);
   const newsBedNodesRef = useRef([]);
+  const newsBedPulseTimerRef = useRef(null);
   const hostTrackCounterRef = useRef(0);
   const lastCountedSlotKeyRef = useRef('');
   const hostNextAfterTracksRef = useRef(2);
@@ -249,28 +250,37 @@ export default function RadioHost() {
       const master = ctx.createGain();
       master.gain.value = 0.0001;
       master.connect(ctx.destination);
-      const freqs = [174.61, 220, 261.63];
-      const nodes = freqs.map((f) => {
-        const osc = ctx.createOscillator();
-        osc.type = 'triangle';
-        osc.frequency.value = f;
-        const g = ctx.createGain();
-        g.gain.value = 0.0001;
-        osc.connect(g);
-        g.connect(master);
-        osc.start();
-        return { osc, gain: g };
-      });
+
+      const pulse = (baseFreq = 392) => {
+        const t0 = ctx.currentTime;
+        const notes = [baseFreq, baseFreq * 1.25, baseFreq * 1.5];
+        notes.forEach((f, idx) => {
+          const osc = ctx.createOscillator();
+          osc.type = 'sine';
+          osc.frequency.value = f;
+          const g = ctx.createGain();
+          g.gain.value = 0.0001;
+          osc.connect(g);
+          g.connect(master);
+          const startAt = t0 + (idx * 0.06);
+          g.gain.setValueAtTime(0.0001, startAt);
+          g.gain.linearRampToValueAtTime(0.012, startAt + 0.05);
+          g.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.45);
+          osc.start(startAt);
+          osc.stop(startAt + 0.5);
+          newsBedNodesRef.current.push({ osc, gain: g });
+        });
+      };
+
       newsBedCtxRef.current = ctx;
       newsBedMasterGainRef.current = master;
-      newsBedNodesRef.current = nodes;
       const now = ctx.currentTime;
-      nodes.forEach((n, i) => {
-        n.gain.gain.cancelScheduledValues(now);
-        n.gain.gain.linearRampToValueAtTime(0.012 + (i * 0.003), now + 1.2);
-      });
       master.gain.cancelScheduledValues(now);
-      master.gain.linearRampToValueAtTime(0.06, now + 1.4);
+      master.gain.linearRampToValueAtTime(0.045, now + 0.8);
+      pulse(392);
+      newsBedPulseTimerRef.current = window.setInterval(() => {
+        pulse(Math.random() < 0.5 ? 392 : 440);
+      }, 2200);
     } catch (_) {}
   }, []);
 
@@ -283,6 +293,10 @@ export default function RadioHost() {
       if (master) {
         master.gain.cancelScheduledValues(now);
         master.gain.linearRampToValueAtTime(0.0001, now + 0.5);
+      }
+      if (newsBedPulseTimerRef.current) {
+        window.clearInterval(newsBedPulseTimerRef.current);
+        newsBedPulseTimerRef.current = null;
       }
       newsBedNodesRef.current.forEach((n) => {
         try {
@@ -734,6 +748,10 @@ export default function RadioHost() {
   }, [playing, releaseMusicDuck]);
 
   useEffect(() => () => {
+    if (newsBedPulseTimerRef.current) {
+      window.clearInterval(newsBedPulseTimerRef.current);
+      newsBedPulseTimerRef.current = null;
+    }
     if (speakScheduleTimerRef.current) {
       window.clearTimeout(speakScheduleTimerRef.current);
       speakScheduleTimerRef.current = null;
