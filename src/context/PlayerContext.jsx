@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useRef, useCallback, useEffect } from 'react';
-import { tracks as tracksApi, getAudioUrl } from '../api/client';
+import { tracks as tracksApi, getAudioUrl, getPublicAudioUrl } from '../api/client';
 
 const PlayerContext = createContext(null);
 
@@ -79,8 +79,9 @@ export function PlayerProvider({ children }) {
       return;
     }
     const token = localStorage.getItem('novasound_token');
-    if (!token) return;
-    const url = getAudioUrl(track);
+    const allowGuestRadio = Boolean(opts.isRadioPublic);
+    if (!token && !allowGuestRadio) return;
+    const url = token ? getAudioUrl(track) : getPublicAudioUrl(track);
     if (!url) return;
     debugLog('load-track', { trackId: track._id, title: track.title });
     const audio = new Audio(url);
@@ -156,6 +157,8 @@ export function PlayerProvider({ children }) {
 
     audio.addEventListener('ended', () => {
       if (isRadioModeRef.current) {
+        const token = localStorage.getItem('novasound_token');
+        const isRadioPublic = !token;
         const endedId = track?._id ? String(track._id) : '';
         tracksApi.radioNow({ limit: 30 })
           .then(({ data }) => {
@@ -169,10 +172,10 @@ export function PlayerProvider({ children }) {
               // сразу перескакиваем на следующий элемент очереди.
               if (endedId && String(q[idx]?._id || '') === endedId && q.length > 1) {
                 const nextIdx = (idx + 1) % q.length;
-                playQueueTrack(q[nextIdx], q, nextIdx, { startAtSec: 0 });
+                playQueueTrack(q[nextIdx], q, nextIdx, { startAtSec: 0, isRadioPublic });
                 return;
               }
-              playQueueTrack(q[idx] || now, q, idx, { startAtSec });
+              playQueueTrack(q[idx] || now, q, idx, { startAtSec, isRadioPublic });
               return;
             }
             setPlaying(false);
@@ -232,7 +235,7 @@ export function PlayerProvider({ children }) {
       desiredPlayingRef.current = false;
       debugLog('play-failed', { trackId: track._id });
     });
-    tracksApi.play(track._id).catch(() => {});
+    if (token) tracksApi.play(track._id).catch(() => {});
   }, [debugLog, normalizeQueue, releaseAudio, resetPlayerState]);
 
   const loadTrack = useCallback((track, options = {}) => {
@@ -249,7 +252,10 @@ export function PlayerProvider({ children }) {
     const q = normalizeQueue(options.queue, track);
     let idx = Number.isFinite(options.startIndex) ? Number(options.startIndex) : q.findIndex((t) => String(t?._id) === String(track._id));
     if (idx < 0) idx = 0;
-    playQueueTrack(q[idx] || track, q, idx, { startAtSec: options.startAtSec });
+    playQueueTrack(q[idx] || track, q, idx, {
+      startAtSec: options.startAtSec,
+      isRadioPublic: options.isRadioPublic
+    });
   }, [normalizeQueue, playQueueTrack]);
 
   const playNext = useCallback(() => {
@@ -362,13 +368,15 @@ export function PlayerProvider({ children }) {
       debugLog('pause');
     } else {
       if (isRadioMode) {
+        const token = localStorage.getItem('novasound_token');
+        const isRadioPublic = !token;
         tracksApi.radioNow({ limit: 30 })
           .then(({ data }) => {
             const now = data?.now || null;
             const q = Array.isArray(data?.queue) ? data.queue : [];
             const startAtSec = Number(data?.nowOffsetSec) || 0;
             if (now && q.length) {
-              loadTrack(now, { queue: q, startIndex: 0, isRadio: true, startAtSec });
+              loadTrack(now, { queue: q, startIndex: 0, isRadio: true, isRadioPublic, startAtSec });
               return;
             }
             desiredPlayingRef.current = true;
