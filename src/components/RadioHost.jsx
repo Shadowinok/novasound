@@ -324,6 +324,7 @@ export default function RadioHost() {
   const speakHostForTrack = useCallback(async (opts = {}) => {
     const duckFactor = Math.max(0, Math.min(1, Number(opts.duckFactor ?? DUCK_MUSIC_FACTOR)));
     const forceFormat = String(opts.forceFormat || '');
+    const announceMode = String(opts.announceMode || 'future');
     if (!isRadioMode) return;
     if (!playing) return;
     if (!activeNow) return;
@@ -377,6 +378,7 @@ export default function RadioHost() {
     const bestTitle = String(best?.title || fallbackBestTitle);
     if (!bestTitle.trim()) return;
 
+    const currentTitle = String(activeNow?.title || 'текущий трек');
     const nextTitle = effectiveNext.title || 'следующая песня';
     const nextAuthorRaw = effectiveNext.author?.username || '—';
     const nextAuthorSpoken = transcribeNickToSpokenRu(nextAuthorRaw);
@@ -389,15 +391,44 @@ export default function RadioHost() {
     const trackWithMaybeAuthor = includeAuthor
       ? `${trackTitleNorm}, автор ${nextAuthorSpoken}`
       : trackTitleNorm;
+    const queueTailTitles = Array.isArray(queue)
+      ? queue
+        .slice(Math.max(0, queueIndex + 1), Math.max(0, queueIndex + 4))
+        .map((t) => String(t?.title || '').trim())
+        .filter(Boolean)
+      : [];
+    const playlistMoodWords = [
+      'интересных',
+      'свежих',
+      'атмосферных',
+      'цепляющих',
+      'неожиданных',
+      'мощных'
+    ];
+    const moodWord = randPick(playlistMoodWords);
+    const programListLine = queueTailTitles.length
+      ? randPick([
+        `В сегодняшнем эфире прозвучат несколько ${moodWord} треков: ${queueTailTitles.join(', ')}.`,
+        `По плану эфира на ближайшие минуты — ${queueTailTitles.join(', ')}.`,
+        `Дальше в нашей музыкальной линии: ${queueTailTitles.join(', ')}.`,
+        `Сегодня ещё поймаем вот такие вайбы: ${queueTailTitles.join(', ')}.`
+      ])
+      : randPick([
+        `В сегодняшнем эфире будет ещё несколько ${moodWord} треков, не переключайся.`,
+        'В этом блоке ещё будет чем удивить — слушаем дальше.',
+        'Держись на линии эфира, дальше будет вкусно по музыке.'
+      ]);
     const announceWithDjLead = chance(0.24);
     const djSelfTemplates = [
       'С вами ДИДЖЕЙ ИИ.',
       'У микрофона ваш ДИДЖЕЙ ИИ.',
       'Как всегда на связи ваш ДИДЖЕЙ ИИ.',
-      'В эфире ваш ДИДЖЕЙ ИИ.'
+      'В эфире ваш ДИДЖЕЙ ИИ.',
+      'На волне снова ДИДЖЕЙ ИИ.',
+      'ДИДЖЕЙ ИИ в эфире, продолжаем.'
     ];
 
-    const trackLeadTemplates = [
+    const trackLeadFutureTemplates = [
       `Дальше у нас ${trackWithMaybeAuthor}.`,
       `Следом в эфире ${trackWithMaybeAuthor}.`,
       `Сейчас поставлю ${trackWithMaybeAuthor}.`,
@@ -405,19 +436,28 @@ export default function RadioHost() {
       `На очереди ${trackWithMaybeAuthor}.`,
       `Следующей мы послушаем ${trackWithMaybeAuthor}.`
     ];
+    const trackLeadCurrentTemplates = [
+      `Сейчас в эфире ${currentTitle}.`,
+      `Прямо сейчас играет ${currentTitle}.`,
+      `Сейчас слушаем ${currentTitle}.`
+    ];
 
     const trackPunTemplates = [
       `Если название “${trackTitleNorm}”, значит настроение уже выбрано за нас.`,
       `У трека “${trackTitleNorm}” вайб как у пятницы: появляется внезапно и вовремя.`,
       `Судя по названию “${trackTitleNorm}”, сегодня будет не скучно.`,
-      `Название “${trackTitleNorm}” звучит как план на вечер. План одобряю.`
+      `Название “${trackTitleNorm}” звучит как план на вечер. План одобряю.`,
+      `Трек “${trackTitleNorm}” звучит как человек, который точно знает, что делает.`,
+      `У “${trackTitleNorm}” энергия будто его писали с выключенным тормозом.`
     ];
 
     const lightTalkTemplates = [
       'Я тут проверил атмосферу в эфире: всё стабильно, музыка лечит.',
       'Короткий техперерыв на мысль: хороший трек иногда лучше длинного объяснения.',
       'В эфире всё по классике: меньше суеты, больше звука.',
-      'Сегодня играем без лишнего шума, только то, что цепляет.'
+      'Сегодня играем без лишнего шума, только то, что цепляет.',
+      'Небольшой апдейт по настроению: держимся в правильной музыкальной полосе.',
+      'Эфир идёт ровно так, как надо: немного драйва, немного воздуха.'
     ];
 
     const stationIdTemplates = [
@@ -429,7 +469,9 @@ export default function RadioHost() {
     const newsJokeTemplates = [
       `В ленте пишут: “${newsTitle}”. Звучит так уверенно, что я почти поверил.`,
       `Новости шепнули: “${newsTitle}”. Уровень драмы приличный, берём в эфир.`,
-      `Поймал заголовок: “${newsTitle}”. Комментарий один: красиво сказано.`
+      `Поймал заголовок: “${newsTitle}”. Комментарий один: красиво сказано.`,
+      `В новостях промелькнуло: “${newsTitle}”. Подача смелая, как минимум.`,
+      `Лента выдала: “${newsTitle}”. Формулировка с характером, спорить не буду.`
     ];
     const newsItemsForBlock = newsPool
       .filter((x) => String(x?.title || '').trim())
@@ -440,8 +482,39 @@ export default function RadioHost() {
       'Маленькое наблюдение: очередь в магазине двигается быстрее в соседней кассе.',
       'Факт дня: если танцевать дома, это уже кардио, а значит почти спорт.',
       'Короткий факт: чай остывает ровно до того момента, когда ты решил его выпить.',
-      'Наблюдение: самые важные мысли приходят, когда телефон остался в другой комнате.'
+      'Наблюдение: самые важные мысли приходят, когда телефон остался в другой комнате.',
+      'Ироничный факт: плейлист на час обычно слушается три часа.',
+      'Любопытно: кнопка «один трек и спать» официально не работает.'
     ];
+
+    const newsCommentaryBuild = () => {
+      const t = String(newsTitle || '').toLowerCase();
+      const sarcastic = [
+        'Выглядит громко, но в эфире проверяем всё ушами.',
+        'Заявлено мощно, а мы спокойно фиксируем факт и идём дальше.',
+        'Ну что ж, заявка заметная. Берём на заметку и продолжаем.'
+      ];
+      const punny = [
+        'Смысл как будто есть, но детали решили остаться за кулисами.',
+        'Заголовок с характером — редактор, видимо, был в настроении.',
+        'Это тот случай, когда фраза звучит быстрее, чем успеваешь моргнуть.'
+      ];
+      if (t.includes('выйд') || t.includes('релиз') || t.includes('анонс')) {
+        return randPick([
+          'Похоже, нас снова готовят к громкому «скоро».',
+          'Классика жанра: «скоро будет», а мы пока слушаем музыку.',
+          'Релизный вайб считан, ждём подтверждения в реальности.'
+        ]);
+      }
+      if (t.includes('тест') || t.includes('провер')) {
+        return randPick([
+          'Тесты любят все, особенно когда сдаёт кто-то другой.',
+          'Проверка принята, настроение не пострадало.',
+          'Звучит как эксперимент, а эксперименты мы уважаем.'
+        ]);
+      }
+      return chance(0.5) ? randPick(sarcastic) : randPick(punny);
+    };
 
     const buildDatePhrase = () => {
       const weekdays = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'];
@@ -456,7 +529,8 @@ export default function RadioHost() {
       return randPick([
         `Сегодня ${wd}, ${day} ${month}.`,
         `На календаре ${wd}, ${day} ${month}.`,
-        `За окном ${wd}, ${day} ${month}.`
+        `За окном ${wd}, ${day} ${month}.`,
+        `Дата для эфира идеальная: ${wd}, ${day} ${month}.`
       ]);
     };
 
@@ -554,8 +628,9 @@ export default function RadioHost() {
     const pickFormat = () => {
       if (forceFormat) return forceFormat;
       const roll = Math.random();
-      if (roll < 0.55) return 'track-intro';
-      if (roll < 0.8) return 'light-talk';
+      if (roll < 0.47) return 'track-intro';
+      if (roll < 0.67) return 'light-talk';
+      if (roll < 0.82) return 'program-list';
       if (roll < 0.95) return 'news-joke';
       return 'id-jingle';
     };
@@ -592,6 +667,7 @@ export default function RadioHost() {
       } else {
         scriptLines.push(`В ленте обсуждают: “${newsTitle}”.`);
       }
+      scriptLines.push(newsCommentaryBuild());
       scriptLines.push(randPick([
         'Это был новостной блок, а теперь возвращаемся к музыке.',
         'На этом с новостями всё, продолжаем эфир.',
@@ -599,28 +675,54 @@ export default function RadioHost() {
       ]));
       if (chance(0.45)) scriptLines.push(randPick(shortIronicFacts));
       if (announceWithDjLead) scriptLines.push(randPick(djSelfTemplates));
-      scriptLines.push(randPick(trackLeadTemplates));
+      scriptLines.push(randPick(trackLeadFutureTemplates));
     } else if (format === 'news-joke' && hostCandidates.length) {
       lastFormatRef.current = 'news-joke';
       scriptLines.push(randPick(newsJokeTemplates));
-      scriptLines.push(randPick(trackLeadTemplates));
+      scriptLines.push(newsCommentaryBuild());
+      if (announceMode === 'future') scriptLines.push(randPick(trackLeadFutureTemplates));
+      else scriptLines.push(programListLine);
     } else if (format === 'id-jingle') {
       lastFormatRef.current = 'id-jingle';
       scriptLines.push(randPick(stationIdTemplates));
-      scriptLines.push(randPick(trackLeadTemplates));
+      if (announceMode === 'future') scriptLines.push(randPick(trackLeadFutureTemplates));
+      else scriptLines.push(programListLine);
     } else if (format === 'light-talk') {
       lastFormatRef.current = 'light-talk';
       scriptLines.push(randPick(lightTalkTemplates));
-      scriptLines.push(randPick(trackLeadTemplates));
+      if (announceMode === 'future') scriptLines.push(randPick(trackLeadFutureTemplates));
+      else scriptLines.push(programListLine);
+    } else if (format === 'program-list') {
+      lastFormatRef.current = 'program-list';
+      if (announceWithDjLead) scriptLines.push(randPick(djSelfTemplates));
+      scriptLines.push(programListLine);
+      if (chance(0.35)) {
+        scriptLines.push(randPick([
+          'Сейчас держим темп, дальше только интереснее.',
+          'Так что устраивайся поудобнее, эфир только разгоняется.',
+          'В общем, программа плотная — едем дальше.'
+        ]));
+      }
     } else {
       lastFormatRef.current = 'track-intro';
       if (announceWithDjLead) scriptLines.push(randPick(djSelfTemplates));
-      scriptLines.push(randPick(trackLeadTemplates));
+      if (announceMode === 'future') {
+        scriptLines.push(randPick(trackLeadFutureTemplates));
+      } else {
+        scriptLines.push(randPick(trackLeadCurrentTemplates));
+        scriptLines.push(programListLine);
+      }
       if (chance(0.55)) scriptLines.push(randPick(trackPunTemplates));
     }
 
     if (lastFormatRef.current !== 'news-block' && chance(0.08) && hostCandidates.length) {
       scriptLines.push(`Кстати, в ленте мелькнул заголовок: “${newsTitle}”.`);
+      scriptLines.push(newsCommentaryBuild());
+      scriptLines.push(randPick([
+        'Дальше по музыкальному курсу.',
+        'Ладно, фиксируем и возвращаемся к трекам.',
+        'А теперь снова в звук — там стабильнее.'
+      ]));
     }
     if (lastFormatRef.current !== 'news-block' && chance(0.12)) {
       scriptLines.push(randPick(shortIronicFacts));
@@ -688,23 +790,28 @@ export default function RadioHost() {
     const roll = Math.random();
     let delayMs = 700;
     let duckFactor = DUCK_MUSIC_FACTOR;
+    let announceMode = 'future';
     if (roll < 0.3) {
       delayMs = 700;
       duckFactor = 0.1;
+      announceMode = 'program';
     } else if (roll < 0.5) {
       delayMs = 650;
       duckFactor = 0.01;
+      announceMode = 'program';
     } else if (roll < 0.7) {
       delayMs = Math.max(450, Math.min(14000, (remainingSec - 2.2) * 1000));
       duckFactor = 0.09;
+      announceMode = 'future';
     } else {
       delayMs = Math.max(450, Math.min(14000, (remainingSec - 6.0) * 1000));
       duckFactor = 0.09;
+      announceMode = 'future';
     }
     if (!Number.isFinite(delayMs) || delayMs < 0) delayMs = 700;
     speakScheduleTimerRef.current = window.setTimeout(() => {
       speakScheduleTimerRef.current = null;
-      void speakHostForTrack({ duckFactor });
+      void speakHostForTrack({ duckFactor, announceMode });
     }, delayMs);
   }, [DUCK_MUSIC_FACTOR, currentTrack?.duration, duration, progress, speakHostForTrack]);
 
