@@ -156,15 +156,23 @@ export function PlayerProvider({ children }) {
 
     audio.addEventListener('ended', () => {
       if (isRadioModeRef.current) {
+        const endedId = track?._id ? String(track._id) : '';
         tracksApi.radioNow({ limit: 30 })
           .then(({ data }) => {
             const now = data?.now || null;
             const q = Array.isArray(data?.queue) ? data.queue : [];
             const startAtSec = Number(data?.nowOffsetSec) || 0;
             if (now && q.length) {
-              const idx = q.findIndex((t) => String(t?._id) === String(now?._id));
-              const safeIdx = idx >= 0 ? idx : 0;
-              playQueueTrack(q[safeIdx] || now, q, safeIdx, { startAtSec });
+              let idx = q.findIndex((t) => String(t?._id) === String(now?._id));
+              if (idx < 0) idx = 0;
+              // Защита от "микроповтора": если сервер всё ещё считает текущим уже закончившийся трек,
+              // сразу перескакиваем на следующий элемент очереди.
+              if (endedId && String(q[idx]?._id || '') === endedId && q.length > 1) {
+                const nextIdx = (idx + 1) % q.length;
+                playQueueTrack(q[nextIdx], q, nextIdx, { startAtSec: 0 });
+                return;
+              }
+              playQueueTrack(q[idx] || now, q, idx, { startAtSec });
               return;
             }
             setPlaying(false);
