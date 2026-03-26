@@ -181,7 +181,7 @@ export default function RadioHost() {
     return s;
   };
 
-  const speakLine = (text) => {
+  const speakLine = (text, rate = '+0%') => {
     if (!text) return Promise.resolve(false);
     const voicePool = ['ru-RU-DmitryNeural', 'ru-RU-MaximNeural', 'ru-RU-PavelNeural'];
     const tryVoice = (idx) => {
@@ -190,7 +190,7 @@ export default function RadioHost() {
         params: {
           text,
           voice: voicePool[idx],
-          rate: '-2%'
+          rate
         },
         responseType: 'blob'
       }).then(({ data }) => {
@@ -431,6 +431,29 @@ export default function RadioHost() {
 
     const scriptLines = episodeLine ? [episodeLine, intro, meta] : [intro, joke, meta];
 
+    // Вариативный темп речи под "вайб" (ориентир: спокойный эфир ~150-170 wpm, энергичный ~170-190 wpm).
+    const pickRateByVibe = () => {
+      const mood = String(episodeForSpeak?.moodType || '').toLowerCase();
+      let minPct = 8;
+      let maxPct = 14;
+      if (mood.includes('chill') || mood.includes('sad')) {
+        minPct = 4;
+        maxPct = 10;
+      } else if (mood.includes('night')) {
+        minPct = 6;
+        maxPct = 12;
+      } else if (mood === 'custom' || mood.includes('energy') || mood.includes('dance')) {
+        minPct = 14;
+        maxPct = 22;
+      }
+      const seedSrc = `${trackKey}:${epId || 'none'}`;
+      let seed = 0;
+      for (const ch of seedSrc) seed = (seed * 33 + ch.charCodeAt(0)) >>> 0;
+      const span = Math.max(0, maxPct - minPct);
+      const pct = minPct + (span ? (seed % (span + 1)) : 0);
+      return `+${pct}%`;
+    };
+
     // TTS только ru-RU (edge-tts) — «мультиязычный» анонс не озвучиваем, текст остаётся по-русски
     if (langHint) {
       scriptLines.push(`Новость с уклоном в тему языка — читаю анонс следующего трека по-русски.`);
@@ -450,7 +473,7 @@ export default function RadioHost() {
         .map((line) => String(line || '').trim())
         .filter(Boolean)
         .join(' ');
-      const played = await speakLine(fullScript);
+      const played = await speakLine(fullScript, pickRateByVibe());
       if (played) {
         lastSpokenKeyRef.current = trackKey;
         if (shouldAnnounceEpisode) {
