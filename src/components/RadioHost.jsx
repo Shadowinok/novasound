@@ -28,24 +28,24 @@ export default function RadioHost() {
 
   const hostTimerRef = useRef(null);
   const lastSpokenKeyRef = useRef('');
+  const hostScheduleSigRef = useRef('');
   const lastEpisodeAnnouncedRef = useRef('');
   const ttsAudioRef = useRef(null);
   const hostPlayingRef = useRef(false);
   const restoreVolumeRef = useRef(null);
   const spokenTitlesRef = useRef([]);
   const hostTrackCounterRef = useRef(0);
-  const lastCountedTrackKeyRef = useRef('');
+  const lastCountedSlotKeyRef = useRef('');
   const hostNextAfterTracksRef = useRef(2);
 
   const activeNow = isRadioMode && currentTrack ? currentTrack : null;
-  const nextTrack = isRadioMode && Array.isArray(queue) && queue.length > queueIndex + 1
-    ? queue[queueIndex + 1]
-    : null;
   const currentTrackId = currentTrack?._id ? String(currentTrack._id) : '';
+  /** Уникальный слот воспроизведения: один и тот же трек может быть в очереди дважды под разными индексами */
+  const playbackSlotKey = currentTrackId ? `${queueIndex}-${currentTrackId}` : '';
 
   const loadHostNews = useCallback(async () => {
     try {
-      const { data } = await client.get('/announcements', { params: { limit: 30 } });
+      const { data } = await client.get('/announcements', { params: { limit: 20 } });
       setHostNews(Array.isArray(data?.items) ? data.items : []);
     } catch (_) {}
   }, []);
@@ -95,6 +95,14 @@ export default function RadioHost() {
   }, [loadHostSettings]);
 
   useEffect(() => {
+    const sig = JSON.stringify({
+      mode: hostSchedule.mode,
+      fixedEverySongs: hostSchedule.fixedEverySongs,
+      randomMinSongs: hostSchedule.randomMinSongs,
+      randomMaxSongs: hostSchedule.randomMaxSongs
+    });
+    if (hostScheduleSigRef.current === sig) return;
+    hostScheduleSigRef.current = sig;
     if (hostSchedule.mode === 'random') {
       const min = Math.max(1, Number(hostSchedule.randomMinSongs) || 2);
       const max = Math.max(min, Number(hostSchedule.randomMaxSongs) || 5);
@@ -107,7 +115,6 @@ export default function RadioHost() {
   const hostCandidates = useMemo(() => {
     const items = Array.isArray(hostNews) ? hostNews : [];
     const allowedKinds = new Set([
-      'ai-news',
       'ai-music-news',
       'ai-creative-news',
       'gaming-news',
@@ -142,7 +149,7 @@ export default function RadioHost() {
     const up = s.toUpperCase();
     const out = up
       .split('')
-      .map((ch) => map[ch] || '')
+      .map((ch) => map[ch] ?? (/\d/.test(ch) ? ch : ''))
       .join('');
     return out || s;
   };
@@ -206,23 +213,32 @@ export default function RadioHost() {
     return tryVoice(0);
   };
 
-  const hasVoiceForLang = (langCode) => {
-    if (!langCode) return false;
-    if (!('speechSynthesis' in window)) return false;
-    const voices = window.speechSynthesis.getVoices?.() || [];
-    if (!voices.length) return false;
-    const target = String(langCode).toLowerCase();
-    return voices.some((v) => String(v.lang || '').toLowerCase().startsWith(target.split('-')[0]));
-  };
-
   const speakHostForTrack = useCallback(async () => {
     if (!isRadioMode) return;
     if (!playing) return;
     if (!activeNow) return;
-    if (!nextTrack) return;
-    const trackKey = `${currentTrackId}`;
+    const trackKey = playbackSlotKey;
     if (!trackKey) return;
     if (lastSpokenKeyRef.current === trackKey && hostPlayingRef.current) return;
+
+    let effectiveNext =
+      isRadioMode && Array.isArray(queue) && queue.length > queueIndex + 1
+        ? queue[queueIndex + 1]
+        : null;
+    if (!effectiveNext) {
+      try {
+        const { data } = await tracksApi.radioNow({ limit: 30 });
+        const q = Array.isArray(data?.queue) ? data.queue : [];
+        const idx = currentTrackId ? q.findIndex((t) => String(t?._id) === currentTrackId) : -1;
+        if (idx >= 0 && idx + 1 < q.length) {
+          effectiveNext = q[idx + 1];
+        } else if (Array.isArray(data?.next) && data.next[0]) {
+          effectiveNext = data.next[0];
+        }
+      } catch (_) {}
+    }
+    if (!effectiveNext) return;
+    if (!playing) return;
 
     const spoken = spokenTitlesRef.current;
     let best = null;
@@ -234,15 +250,14 @@ export default function RadioHost() {
       }) || sorted[0] || hostCandidates[0];
     }
 
-    const fallbackBestTitle = String(djEpisode?.tag || nextTrack.title || 'следующая песня');
+    const fallbackBestTitle = String(djEpisode?.tag || effectiveNext.title || 'следующая песня');
     const bestTitle = String(best?.title || fallbackBestTitle);
     if (!bestTitle.trim()) return;
 
     const langHint = detectLangHint(bestTitle);
-    const langAvailable = langHint ? hasVoiceForLang(langHint.langCode) : false;
 
-    const nextTitle = nextTrack.title || 'следующая песня';
-    const nextAuthorRaw = nextTrack.author?.username || '—';
+    const nextTitle = effectiveNext.title || 'следующая песня';
+    const nextAuthorRaw = effectiveNext.author?.username || '—';
     const nextAuthorSpoken = transcribeNickToSpokenRu(nextAuthorRaw);
     const announcement = `Следующая песня: ${nextTitle}. Автор: ${nextAuthorSpoken}.`;
 
@@ -330,11 +345,6 @@ export default function RadioHost() {
         'Не угадали? Тогда слушайте дальше — всё станет ясно.',
         'А теперь без спойлеров… ладно, со спойлерами.'
       ],
-      noVoice: [
-        'Не получилось на нужном языке — это был мой мини-троллинг.',
-        'Голосов подходящих нет, поэтому признаюсь: было попытка и шутка.',
-        'Если не поняли — просто знайте: это всё равно был анонс следующего трека.'
-      ],
       noLang: [
         'Если не поняли — это был анонс следующего трека.',
         'А для тех кто не врубился — я всё объяснил уже сейчас.',
@@ -390,16 +400,11 @@ export default function RadioHost() {
 
     const scriptLines = episodeLine ? [episodeLine, intro, meta] : [intro, joke, meta];
 
+    // TTS только ru-RU (edge-tts) — «мультиязычный» анонс не озвучиваем, текст остаётся по-русски
     if (langHint) {
-      if (langAvailable) {
-        scriptLines.push(`А теперь анонс на ${langHint.label}.`);
-        scriptLines.push(announcement);
-        scriptLines.push(randPick(explainTemplates.ok));
-      } else {
-        scriptLines.push(`Не получилось на ${langHint.label}. Поэтому по-русски:`);
-        scriptLines.push(announcement);
-        scriptLines.push(randPick(explainTemplates.noVoice));
-      }
+      scriptLines.push(`Новость с уклоном в тему языка — читаю анонс следующего трека по-русски.`);
+      scriptLines.push(announcement);
+      scriptLines.push(randPick(explainTemplates.ok));
     } else {
       scriptLines.push(announcement);
       scriptLines.push(randPick(explainTemplates.noLang));
@@ -439,18 +444,20 @@ export default function RadioHost() {
     activeNow,
     hostCandidates,
     isRadioMode,
-    nextTrack,
     playing,
     currentTrackId,
+    playbackSlotKey,
+    queue,
+    queueIndex,
     setPlayerVolume,
     volume,
     djEpisode
   ]);
 
   useEffect(() => {
-    if (!isRadioMode || !playing || !currentTrackId) return;
-    if (lastCountedTrackKeyRef.current === currentTrackId) return;
-    lastCountedTrackKeyRef.current = currentTrackId;
+    if (!isRadioMode || !playing || !playbackSlotKey) return;
+    if (lastCountedSlotKeyRef.current === playbackSlotKey) return;
+    lastCountedSlotKeyRef.current = playbackSlotKey;
     hostTrackCounterRef.current += 1;
     if (hostTrackCounterRef.current < hostNextAfterTracksRef.current) return;
     hostTrackCounterRef.current = 0;
@@ -462,11 +469,12 @@ export default function RadioHost() {
     } else {
       hostNextAfterTracksRef.current = Math.max(1, Number(hostSchedule.fixedEverySongs) || 2);
     }
-    speakHostForTrack();
-  }, [isRadioMode, playing, currentTrackId, speakHostForTrack, hostSchedule]);
+    void speakHostForTrack();
+  }, [isRadioMode, playing, playbackSlotKey, speakHostForTrack, hostSchedule]);
 
   useEffect(() => {
     if (playing) return;
+    if (hostPlayingRef.current) return;
     if (ttsAudioRef.current) {
       try { ttsAudioRef.current.pause(); } catch (_) {}
       ttsAudioRef.current = null;
