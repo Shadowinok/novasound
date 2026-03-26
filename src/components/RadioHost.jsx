@@ -15,6 +15,8 @@ export default function RadioHost() {
     queueIndex,
     isRadioMode,
     playing,
+    progress,
+    duration,
     volume,
     applyMusicDuck,
     releaseMusicDuck
@@ -41,7 +43,12 @@ export default function RadioHost() {
   /** Громкость голоса ведущего относительно пользовательской громкости плеера */
   const HOST_VOICE_FACTOR = 0.72;
   const lastNewsBlockAtRef = useRef(0);
+  const lastHourlyNewsKeyRef = useRef('');
   const lastFormatRef = useRef('');
+  const speakScheduleTimerRef = useRef(null);
+  const newsBedCtxRef = useRef(null);
+  const newsBedMasterGainRef = useRef(null);
+  const newsBedNodesRef = useRef([]);
   const hostTrackCounterRef = useRef(0);
   const lastCountedSlotKeyRef = useRef('');
   const hostNextAfterTracksRef = useRef(2);
@@ -234,7 +241,76 @@ export default function RadioHost() {
     return tryVoice(0);
   };
 
-  const speakHostForTrack = useCallback(async () => {
+  const startNewsBed = useCallback(() => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      if (newsBedCtxRef.current) return;
+      const ctx = new AudioCtx();
+      const master = ctx.createGain();
+      master.gain.value = 0.0001;
+      master.connect(ctx.destination);
+      const freqs = [174.61, 220, 261.63];
+      const nodes = freqs.map((f) => {
+        const osc = ctx.createOscillator();
+        osc.type = 'triangle';
+        osc.frequency.value = f;
+        const g = ctx.createGain();
+        g.gain.value = 0.0001;
+        osc.connect(g);
+        g.connect(master);
+        osc.start();
+        return { osc, gain: g };
+      });
+      newsBedCtxRef.current = ctx;
+      newsBedMasterGainRef.current = master;
+      newsBedNodesRef.current = nodes;
+      const now = ctx.currentTime;
+      nodes.forEach((n, i) => {
+        n.gain.gain.cancelScheduledValues(now);
+        n.gain.gain.linearRampToValueAtTime(0.012 + (i * 0.003), now + 1.2);
+      });
+      master.gain.cancelScheduledValues(now);
+      master.gain.linearRampToValueAtTime(0.06, now + 1.4);
+    } catch (_) {}
+  }, []);
+
+  const stopNewsBed = useCallback(() => {
+    const ctx = newsBedCtxRef.current;
+    if (!ctx) return;
+    try {
+      const now = ctx.currentTime;
+      const master = newsBedMasterGainRef.current;
+      if (master) {
+        master.gain.cancelScheduledValues(now);
+        master.gain.linearRampToValueAtTime(0.0001, now + 0.5);
+      }
+      newsBedNodesRef.current.forEach((n) => {
+        try {
+          n.gain.gain.cancelScheduledValues(now);
+          n.gain.gain.linearRampToValueAtTime(0.0001, now + 0.5);
+        } catch (_) {}
+      });
+      window.setTimeout(() => {
+        try {
+          newsBedNodesRef.current.forEach((n) => {
+            try { n.osc.stop(); } catch (_) {}
+            try { n.osc.disconnect(); } catch (_) {}
+            try { n.gain.disconnect(); } catch (_) {}
+          });
+          newsBedNodesRef.current = [];
+          if (newsBedMasterGainRef.current) newsBedMasterGainRef.current.disconnect();
+          newsBedMasterGainRef.current = null;
+          if (newsBedCtxRef.current) newsBedCtxRef.current.close();
+          newsBedCtxRef.current = null;
+        } catch (_) {}
+      }, 600);
+    } catch (_) {}
+  }, []);
+
+  const speakHostForTrack = useCallback(async (opts = {}) => {
+    const duckFactor = Math.max(0, Math.min(1, Number(opts.duckFactor ?? DUCK_MUSIC_FACTOR)));
+    const forceFormat = String(opts.forceFormat || '');
     if (!isRadioMode) return;
     if (!playing) return;
     if (!activeNow) return;
@@ -339,6 +415,13 @@ export default function RadioHost() {
       `В ленте пишут: “${newsTitle}”. Звучит так уверенно, что я почти поверил.`,
       `Новости шепнули: “${newsTitle}”. Уровень драмы приличный, берём в эфир.`,
       `Поймал заголовок: “${newsTitle}”. Комментарий один: красиво сказано.`
+    ];
+    const shortIronicFacts = [
+      'Интересный факт: будильник всегда звонит на самом интересном месте сна.',
+      'Маленькое наблюдение: очередь в магазине двигается быстрее в соседней кассе.',
+      'Факт дня: если танцевать дома, это уже кардио, а значит почти спорт.',
+      'Короткий факт: чай остывает ровно до того момента, когда ты решил его выпить.',
+      'Наблюдение: самые важные мысли приходят, когда телефон остался в другой комнате.'
     ];
 
     const buildDatePhrase = () => {
@@ -450,6 +533,7 @@ export default function RadioHost() {
       return `+${pct}%`;
     };
     const pickFormat = () => {
+      if (forceFormat) return forceFormat;
       const now = Date.now();
       const canNewsBlock = hostCandidates.length > 0 && (now - lastNewsBlockAtRef.current) >= (60 * 60 * 1000);
       if (canNewsBlock && chance(0.65)) return 'news-block';
@@ -487,6 +571,7 @@ export default function RadioHost() {
         'На этом с новостями всё, продолжаем эфир.',
         'Новости на паузу, треки на максимум.'
       ]));
+      if (chance(0.45)) scriptLines.push(randPick(shortIronicFacts));
       if (announceWithDjLead) scriptLines.push(randPick(djSelfTemplates));
       scriptLines.push(randPick(trackLeadTemplates));
     } else if (format === 'news-joke' && hostCandidates.length) {
@@ -511,11 +596,15 @@ export default function RadioHost() {
     if (lastFormatRef.current !== 'news-block' && chance(0.08) && hostCandidates.length) {
       scriptLines.push(`Кстати, в ленте мелькнул заголовок: “${newsTitle}”.`);
     }
+    if (lastFormatRef.current !== 'news-block' && chance(0.12)) {
+      scriptLines.push(randPick(shortIronicFacts));
+    }
 
     try {
       if (hostPlayingRef.current) return;
       hostPlayingRef.current = true;
-      applyMusicDuck(DUCK_MUSIC_FACTOR);
+      if (forceFormat === 'news-block') startNewsBed();
+      applyMusicDuck(duckFactor);
       // Один запрос вместо серии фраз: меньше сетевых пауз между репликами.
       const fullScript = scriptLines
         .map((line) => String(line || '').trim())
@@ -536,6 +625,7 @@ export default function RadioHost() {
       // TTS недоступен
     } finally {
       releaseMusicDuck();
+      if (forceFormat === 'news-block') stopNewsBed();
       hostPlayingRef.current = false;
     }
   }, [
@@ -549,10 +639,45 @@ export default function RadioHost() {
     queue,
     queueIndex,
     releaseMusicDuck,
+    startNewsBed,
+    stopNewsBed,
     volume,
     djEpisode,
     setDjEpisode
   ]);
+
+  const scheduleSpeakForTrack = useCallback(() => {
+    if (speakScheduleTimerRef.current) {
+      window.clearTimeout(speakScheduleTimerRef.current);
+      speakScheduleTimerRef.current = null;
+    }
+    const remainingSec = Math.max(
+      0,
+      Number(duration || currentTrack?.duration || 0) - Number(progress || 0)
+    );
+    // 30% начало, 20% без наложения, 20% склейка, 30% конец.
+    const roll = Math.random();
+    let delayMs = 700;
+    let duckFactor = DUCK_MUSIC_FACTOR;
+    if (roll < 0.3) {
+      delayMs = 700;
+      duckFactor = 0.1;
+    } else if (roll < 0.5) {
+      delayMs = 650;
+      duckFactor = 0.01;
+    } else if (roll < 0.7) {
+      delayMs = Math.max(450, Math.min(14000, (remainingSec - 2.2) * 1000));
+      duckFactor = 0.09;
+    } else {
+      delayMs = Math.max(450, Math.min(14000, (remainingSec - 6.0) * 1000));
+      duckFactor = 0.09;
+    }
+    if (!Number.isFinite(delayMs) || delayMs < 0) delayMs = 700;
+    speakScheduleTimerRef.current = window.setTimeout(() => {
+      speakScheduleTimerRef.current = null;
+      void speakHostForTrack({ duckFactor });
+    }, delayMs);
+  }, [DUCK_MUSIC_FACTOR, currentTrack?.duration, duration, progress, speakHostForTrack]);
 
   useEffect(() => {
     if (!isRadioMode || !playing || !playbackSlotKey) return;
@@ -569,8 +694,37 @@ export default function RadioHost() {
     } else {
       hostNextAfterTracksRef.current = Math.max(1, Number(hostSchedule.fixedEverySongs) || 2);
     }
-    void speakHostForTrack();
-  }, [isRadioMode, playing, playbackSlotKey, speakHostForTrack, hostSchedule]);
+    scheduleSpeakForTrack();
+  }, [isRadioMode, playing, playbackSlotKey, scheduleSpeakForTrack, hostSchedule]);
+
+  useEffect(() => {
+    if (playing) return;
+    if (speakScheduleTimerRef.current) {
+      window.clearTimeout(speakScheduleTimerRef.current);
+      speakScheduleTimerRef.current = null;
+    }
+  }, [playing]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (!isRadioMode || !playing) return;
+      if (hostPlayingRef.current) return;
+      const now = new Date();
+      if (now.getMinutes() !== 0) return;
+      // Узкое окно старта блока "по часам".
+      if (now.getSeconds() > 8) return;
+      const hourKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}-${now.getHours()}`;
+      if (lastHourlyNewsKeyRef.current === hourKey) return;
+      lastHourlyNewsKeyRef.current = hourKey;
+      lastNewsBlockAtRef.current = Date.now();
+      if (speakScheduleTimerRef.current) {
+        window.clearTimeout(speakScheduleTimerRef.current);
+        speakScheduleTimerRef.current = null;
+      }
+      void speakHostForTrack({ forceFormat: 'news-block', duckFactor: 0.02 });
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [isRadioMode, playing, speakHostForTrack]);
 
   useEffect(() => {
     if (playing) return;
@@ -584,12 +738,17 @@ export default function RadioHost() {
   }, [playing, releaseMusicDuck]);
 
   useEffect(() => () => {
+    if (speakScheduleTimerRef.current) {
+      window.clearTimeout(speakScheduleTimerRef.current);
+      speakScheduleTimerRef.current = null;
+    }
     if (ttsAudioRef.current) {
       try { ttsAudioRef.current.pause(); } catch (_) {}
       ttsAudioRef.current = null;
     }
+    stopNewsBed();
     releaseMusicDuck();
-  }, [releaseMusicDuck]);
+  }, [releaseMusicDuck, stopNewsBed]);
 
   return null;
 }
