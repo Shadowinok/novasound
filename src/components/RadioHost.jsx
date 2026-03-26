@@ -22,7 +22,8 @@ export default function RadioHost() {
     applyMusicDuck,
     releaseMusicDuck,
     pauseForHost,
-    resumeAfterHost
+    resumeAfterHost,
+    advanceRadioAfterHost
   } = usePlayer();
 
   const [hostNews, setHostNews] = useState([]);
@@ -360,10 +361,12 @@ export default function RadioHost() {
     const forceFormat = String(opts.forceFormat || '');
     const announceMode = String(opts.announceMode || 'future');
     const pauseMusic = Boolean(opts.pauseMusic);
+    const advanceToNextAfterSpeak = Boolean(opts.advanceToNextAfterSpeak);
     if (!isRadioMode) return;
     if (!playing) return;
     if (!activeNow) return;
     const trackKey = playbackSlotKey;
+    const trackIdAtSpeakStart = currentTrackId;
     if (!trackKey) return;
     if (lastSpokenKeyRef.current === trackKey && hostPlayingRef.current) return;
 
@@ -839,7 +842,14 @@ export default function RadioHost() {
     } catch (_) {
       // TTS недоступен
     } finally {
-      if (pauseMusic && isRadioMode) resumeAfterHost();
+      if (pauseMusic && isRadioMode) {
+        if (advanceToNextAfterSpeak) {
+          const moved = await advanceRadioAfterHost(trackIdAtSpeakStart);
+          if (!moved) resumeAfterHost();
+        } else {
+          resumeAfterHost();
+        }
+      }
       releaseMusicDuck();
       if (forceFormat === 'news-block') stopNewsBed();
       hostPlayingRef.current = false;
@@ -862,6 +872,8 @@ export default function RadioHost() {
     volume,
     djEpisode,
     setDjEpisode
+    ,
+    advanceRadioAfterHost
   ]);
 
   const scheduleSpeakForTrack = useCallback(() => {
@@ -879,16 +891,18 @@ export default function RadioHost() {
     let duckFactor = DUCK_MUSIC_FACTOR;
     let announceMode = 'future';
     let pauseMusic = false;
+    let advanceToNextAfterSpeak = false;
     if (roll < 0.3) {
       delayMs = 700;
       duckFactor = 0.1;
       announceMode = 'program';
     } else if (roll < 0.5) {
-      // Вариант "между песнями без наложения": ставим музыку на паузу, говорим, продолжаем.
-      delayMs = Math.max(350, Math.min(12000, (remainingSec - 0.9) * 1000));
+      // "Честный" межтрековый брейк: перед концом трека ставим паузу, говорим и запускаем следующий.
+      delayMs = Math.max(250, Math.min(12000, (remainingSec - 0.18) * 1000));
       duckFactor = 0;
       announceMode = 'program';
       pauseMusic = true;
+      advanceToNextAfterSpeak = true;
     } else if (roll < 0.7) {
       delayMs = Math.max(450, Math.min(14000, (remainingSec - 2.2) * 1000));
       duckFactor = 0.09;
@@ -901,7 +915,7 @@ export default function RadioHost() {
     if (!Number.isFinite(delayMs) || delayMs < 0) delayMs = 700;
     speakScheduleTimerRef.current = window.setTimeout(() => {
       speakScheduleTimerRef.current = null;
-      void speakHostForTrack({ duckFactor, announceMode, pauseMusic });
+      void speakHostForTrack({ duckFactor, announceMode, pauseMusic, advanceToNextAfterSpeak });
     }, delayMs);
   }, [DUCK_MUSIC_FACTOR, currentTrack?.duration, duration, progress, speakHostForTrack]);
 
