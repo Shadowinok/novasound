@@ -293,3 +293,9 @@ export function getAudioUrl(track) {
   if (!token) return base;
   return `${base}?token=${encodeURIComponent(token)}`;
 }
+
+/** Публичный URL стрима для гостевого радио-плеера (только approved треки). */
+export function getPublicAudioUrl(track) {
+  if (!track?.audioFileId) return '';
+  return `${API_ORIGIN}/api/tracks/audio-public/${track.audioFileId}`;
+}
