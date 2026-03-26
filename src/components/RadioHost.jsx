@@ -445,14 +445,13 @@ export default function RadioHost() {
       if (hostPlayingRef.current) return;
       hostPlayingRef.current = true;
       applyMusicDuck(DUCK_MUSIC_FACTOR);
-      let playedLines = 0;
-      // eslint-disable-next-line no-restricted-syntax
-      for (const line of scriptLines) {
-        // eslint-disable-next-line no-await-in-loop
-        const ok = await speakLine(line);
-        if (ok) playedLines += 1;
-      }
-      if (playedLines > 0) {
+      // Один запрос вместо серии фраз: меньше сетевых пауз между репликами.
+      const fullScript = scriptLines
+        .map((line) => String(line || '').trim())
+        .filter(Boolean)
+        .join(' ');
+      const played = await speakLine(fullScript);
+      if (played) {
         lastSpokenKeyRef.current = trackKey;
         if (shouldAnnounceEpisode) {
           lastEpisodeAnnouncedRef.current = epId;
