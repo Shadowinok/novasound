@@ -28,6 +28,7 @@ export function PlayerProvider({ children }) {
   const queueIndexRef = useRef(0);
   const repeatModeRef = useRef('all');
   const desiredPlayingRef = useRef(false);
+  const pausedByHostRef = useRef(false);
   const radioAutoResumeCooldownRef = useRef(0);
   const playerDebugRef = useRef(localStorage.getItem('novasound_player_debug') === '1');
 
@@ -342,6 +343,27 @@ export function PlayerProvider({ children }) {
     }
   }, []);
 
+  /** Временная пауза музыки для реплики ведущего (без смены трека/очереди). */
+  const pauseForHost = useCallback(() => {
+    if (!audioRef.current) return;
+    if (audioRef.current.paused) return;
+    pausedByHostRef.current = true;
+    desiredPlayingRef.current = false;
+    try { audioRef.current.pause(); } catch (_) {}
+  }, []);
+
+  const resumeAfterHost = useCallback(() => {
+    if (!audioRef.current) return;
+    if (!pausedByHostRef.current) return;
+    pausedByHostRef.current = false;
+    desiredPlayingRef.current = true;
+    audioRef.current.play()
+      .then(() => setPlaying(true))
+      .catch(() => {
+        desiredPlayingRef.current = false;
+      });
+  }, []);
+
   /** Приглушить только музыку (ведущий / наложения); ползунок и сохранённая громкость — громкость пользователя */
   const applyMusicDuck = useCallback((multiplier) => {
     const m = Math.max(0, Math.min(1, Number(multiplier)));
@@ -457,6 +479,8 @@ export function PlayerProvider({ children }) {
       cycleRepeatMode,
       seek,
       setPlayerVolume,
+      pauseForHost,
+      resumeAfterHost,
       applyMusicDuck,
       releaseMusicDuck,
       setProgress,
