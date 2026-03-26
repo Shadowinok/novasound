@@ -30,6 +30,7 @@ export function PlayerProvider({ children }) {
   const desiredPlayingRef = useRef(false);
   const pausedByHostRef = useRef(false);
   const radioAutoResumeCooldownRef = useRef(0);
+  const radioSwitchingAfterEndRef = useRef(false);
   const playerDebugRef = useRef(localStorage.getItem('novasound_player_debug') === '1');
 
   useEffect(() => {
@@ -75,6 +76,7 @@ export function PlayerProvider({ children }) {
 
   const playQueueTrack = useCallback((track, nextQueue, nextIndex, opts = {}) => {
     releaseAudio();
+    radioSwitchingAfterEndRef.current = false;
     if (!track) {
       resetPlayerState();
       return;
@@ -140,6 +142,12 @@ export function PlayerProvider({ children }) {
       if (!isRadioModeRef.current) return;
       if (!desiredPlayingRef.current) return;
       if (audioRef.current !== audio) return;
+      if (pausedByHostRef.current) return;
+      if (radioSwitchingAfterEndRef.current) return;
+      if (audio.ended) return;
+      const d = Number(audio.duration);
+      const t = Number(audio.currentTime);
+      if (Number.isFinite(d) && d > 0 && Number.isFinite(t) && d - t < 1.2) return;
       const now = Date.now();
       if (now - radioAutoResumeCooldownRef.current < 1500) return;
       radioAutoResumeCooldownRef.current = now;
@@ -157,6 +165,7 @@ export function PlayerProvider({ children }) {
     audio.addEventListener('canplay', applyStartOffset);
 
     audio.addEventListener('ended', () => {
+      radioSwitchingAfterEndRef.current = true;
       if (isRadioModeRef.current) {
         const token = localStorage.getItem('novasound_token');
         const isRadioPublic = !token;
@@ -179,10 +188,12 @@ export function PlayerProvider({ children }) {
               playQueueTrack(q[idx] || now, q, idx, { startAtSec, isRadioPublic });
               return;
             }
+            radioSwitchingAfterEndRef.current = false;
             setPlaying(false);
             setProgress(0);
           })
           .catch(() => {
+            radioSwitchingAfterEndRef.current = false;
             setPlaying(false);
             setProgress(0);
           });
@@ -193,11 +204,13 @@ export function PlayerProvider({ children }) {
       const q = queueRef.current;
       const idx = queueIndexRef.current;
       if (mode === 'one-repeat') {
+        radioSwitchingAfterEndRef.current = false;
         audio.currentTime = 0;
         audio.play().catch(() => {});
         return;
       }
       if (mode === 'one') {
+        radioSwitchingAfterEndRef.current = false;
         setPlaying(false);
         setProgress(0);
         return;
@@ -214,6 +227,7 @@ export function PlayerProvider({ children }) {
         playQueueTrack(q[0], q, 0);
         return;
       }
+      radioSwitchingAfterEndRef.current = false;
       setPlaying(false);
       setProgress(0);
     });
