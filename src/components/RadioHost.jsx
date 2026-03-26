@@ -40,6 +40,8 @@ export default function RadioHost() {
   const DUCK_MUSIC_FACTOR = 0.09;
   /** Громкость голоса ведущего относительно пользовательской громкости плеера */
   const HOST_VOICE_FACTOR = 0.72;
+  const lastNewsBlockAtRef = useRef(0);
+  const lastFormatRef = useRef('');
   const hostTrackCounterRef = useRef(0);
   const lastCountedSlotKeyRef = useRef('');
   const hostNextAfterTracksRef = useRef(2);
@@ -284,108 +286,104 @@ export default function RadioHost() {
     const bestTitle = String(best?.title || fallbackBestTitle);
     if (!bestTitle.trim()) return;
 
-    const langHint = detectLangHint(bestTitle);
-
     const nextTitle = effectiveNext.title || 'следующая песня';
     const nextAuthorRaw = effectiveNext.author?.username || '—';
     const nextAuthorSpoken = transcribeNickToSpokenRu(nextAuthorRaw);
-    const announcement = `Следующая песня: ${nextTitle}. Автор: ${nextAuthorSpoken}.`;
-
-    const title = bestTitle.slice(0, 120);
-
     const randPick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+    const chance = (p) => Math.random() < p;
+    const newsTitle = String(bestTitle).slice(0, 120);
 
-    const classifyNews = (t) => {
-      const lt = String(t || '').toLowerCase();
-      if (lt.includes('ни одна') || lt.includes('не знает') || lt.includes('не понимает')) return 'test-absurd';
-      if (lt.includes('тест') || lt.includes('провер') || lt.includes('протест')) return 'test';
-      if (lt.includes('скоро') || lt.includes('замен') || lt.includes('вместо') || lt.includes('выйдет')) return 'soon-replace';
-      if (langHint) return 'language';
-      return 'generic';
-    };
-
-    const kindCandidate = classifyNews(title);
-    const introTemplates = {
-      'test-absurd': [
-        'Слушайте: ведущий ИИ наткнулся на новость — “{title}”.',
-        'Новость дня от ведущего ИИ: “{title}”.',
-        'Проверка на адекватность: “{title}”.'
-      ],
-      test: [
-        'Я прогнал новость через фильтр смысла: “{title}”.',
-        'В новости мелькнул тест — “{title}”.',
-        'Окей, запоминаем: “{title}”.'
-      ],
-      'soon-replace': [
-        'Новость такая: “{title}”.',
-        'В эфире обсуждают замену: “{title}”.',
-        'Скоро что-то изменится — “{title}”.'
-      ],
-      language: [
-        'Кстати, по языку там вот что: “{title}”.',
-        'Сейчас будет лингвистический поворот: “{title}”.',
-        'Новость намекает на язык: “{title}”.'
-      ],
-      generic: [
-        'В новостях пишут: “{title}”.',
-        'Новость из ленты: “{title}”.',
-        'Коротко о главном — “{title}”.'
-      ]
-    };
-
-    const jokeTemplates = {
-      'test-absurd': [
-        'Звучит так, будто кто-то очень старался — и всё равно мимо.',
-        'Я такое люблю: уверенно, но абсурдно.',
-        'Это тот случай, когда “не знает” — значит “проверим ещё раз”.'
-      ],
-      test: [
-        'Тесты — это прекрасно. Главное — чтобы не на нас.',
-        'Проверили, записали, пошутили.',
-        'Окей, тест засчитан… по настроению.'
-      ],
-      'soon-replace': [
-        'Значит, скоро будет сюрприз. В моём случае — два сюрприза.',
-        'Если это правда, готовьте уши: начнётся магия.',
-        'Я чую, сейчас что-то поменяется… и это будет смешно.'
-      ],
-      language: [
-        'Ладно, проверим, как это звучит в эфире.',
-        'Если получится — отлично. Если нет — я подожму хвост и скажу по-русски.',
-        'Язык в новости есть — значит будет язык в анонсе. Теоретически.'
-      ],
-      generic: [
-        'Выглядит странно? Я тоже так подумал.',
-        'Новость — странная, а значит сейчас будет весело.',
-        'Окей, это звучит необычно. Прямо как следующий трек.'
-      ]
-    };
-
-    const kind = introTemplates[kindCandidate] ? kindCandidate : 'generic';
-
-    /* Варианты фраз — общий тон и стиль, не «сценарий из БД» */
-    const metaTemplates = [
-      'Короче, я ИИ-ведущий. Дальше — объявление следующей песни.',
-      'Не пугайтесь: это ИИ-ведущий. Сейчас будет анонс следующего трека.',
-      'Я ИИ-ведущий. Переходим к главному: следующая песня.'
+    const trackTitleNorm = String(nextTitle || '').trim() || 'следующий трек';
+    const includeAuthor = chance(0.42);
+    const trackWithMaybeAuthor = includeAuthor
+      ? `${trackTitleNorm}, автор ${nextAuthorSpoken}`
+      : trackTitleNorm;
+    const announceWithDjLead = chance(0.24);
+    const djSelfTemplates = [
+      'С вами ДИДЖЕЙ ИИ.',
+      'У микрофона ваш ДИДЖЕЙ ИИ.',
+      'Как всегда на связи ваш ДИДЖЕЙ ИИ.',
+      'В эфире ваш ДИДЖЕЙ ИИ.'
     ];
 
-    const explainTemplates = {
-      ok: [
-        'Для тех кто не понял — это был анонс следующего трека.',
-        'Не угадали? Тогда слушайте дальше — всё станет ясно.',
-        'А теперь без спойлеров… ладно, со спойлерами.'
-      ],
-      noLang: [
-        'Если не поняли — это был анонс следующего трека.',
-        'А для тех кто не врубился — я всё объяснил уже сейчас.',
-        'Смысл простой: дальше играем.'
-      ]
+    const trackLeadTemplates = [
+      `Дальше у нас ${trackWithMaybeAuthor}.`,
+      `Следом в эфире ${trackWithMaybeAuthor}.`,
+      `Сейчас поставлю ${trackWithMaybeAuthor}.`,
+      `Лови следующий трек: ${trackWithMaybeAuthor}.`,
+      `На очереди ${trackWithMaybeAuthor}.`,
+      `Следующей мы послушаем ${trackWithMaybeAuthor}.`
+    ];
+
+    const trackPunTemplates = [
+      `Если название “${trackTitleNorm}”, значит настроение уже выбрано за нас.`,
+      `У трека “${trackTitleNorm}” вайб как у пятницы: появляется внезапно и вовремя.`,
+      `Судя по названию “${trackTitleNorm}”, сегодня будет не скучно.`,
+      `Название “${trackTitleNorm}” звучит как план на вечер. План одобряю.`
+    ];
+
+    const lightTalkTemplates = [
+      'Я тут проверил атмосферу в эфире: всё стабильно, музыка лечит.',
+      'Короткий техперерыв на мысль: хороший трек иногда лучше длинного объяснения.',
+      'В эфире всё по классике: меньше суеты, больше звука.',
+      'Сегодня играем без лишнего шума, только то, что цепляет.'
+    ];
+
+    const stationIdTemplates = [
+      'NovaSound Radio на связи. Держим курс на хорошие треки.',
+      'Ты в эфире NovaSound Radio. Продолжаем музыкальное путешествие.',
+      'NovaSound Radio в деле. Без пафоса, зато с правильным вайбом.'
+    ];
+
+    const newsJokeTemplates = [
+      `В ленте пишут: “${newsTitle}”. Звучит так уверенно, что я почти поверил.`,
+      `Новости шепнули: “${newsTitle}”. Уровень драмы приличный, берём в эфир.`,
+      `Поймал заголовок: “${newsTitle}”. Комментарий один: красиво сказано.`
+    ];
+
+    const buildDatePhrase = () => {
+      const weekdays = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'];
+      const monthsGen = [
+        'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+        'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'
+      ];
+      const now = new Date();
+      const wd = weekdays[now.getDay()];
+      const day = now.getDate();
+      const month = monthsGen[now.getMonth()];
+      return randPick([
+        `Сегодня ${wd}, ${day} ${month}.`,
+        `На календаре ${wd}, ${day} ${month}.`,
+        `За окном ${wd}, ${day} ${month}.`
+      ]);
     };
 
-    const intro = randPick(introTemplates[kind]).replace('{title}', title);
-    const joke = randPick(jokeTemplates[kind]);
-    const meta = randPick(metaTemplates);
+    const buildWeatherPhrase = () => {
+      const weatherItems = hostNews.filter((x) => x?.kind === 'weather');
+      if (!weatherItems.length) {
+        return randPick([
+          'По погоде сегодня без сюрпризов — главное, чтобы в наушниках было тепло.',
+          'Погода пусть делает что хочет, у нас в эфире климат стабильный.',
+          'С погодой разберёмся по пути, а сейчас держим музыкальный курс.'
+        ]);
+      }
+      const w = weatherItems[Math.floor(Math.random() * weatherItems.length)];
+      const city = String(w?.city || 'городе');
+      const t = Number(w?.temperatureC);
+      let mood = 'переменно';
+      if (Number.isFinite(t)) {
+        if (t <= -8) mood = 'морозно';
+        else if (t <= 2) mood = 'прохладно';
+        else if (t <= 14) mood = 'свежо';
+        else if (t <= 24) mood = 'тепло';
+        else mood = 'жарко';
+      }
+      return randPick([
+        `В ${city} сейчас ${mood}.`,
+        `По погоде в ${city} сегодня ${mood}.`,
+        `Если смотреть на ${city}, то на улице ${mood}.`
+      ]);
+    };
 
     const buildEpisodeLine = (episode) => {
       if (!episode?.tag) return '';
@@ -429,8 +427,6 @@ export default function RadioHost() {
       episodeLine = buildEpisodeLine(episodeForSpeak);
     }
 
-    const scriptLines = episodeLine ? [episodeLine, intro, meta] : [intro, joke, meta];
-
     // Вариативный темп речи под "вайб" (ориентир: спокойный эфир ~150-170 wpm, энергичный ~170-190 wpm).
     const pickRateByVibe = () => {
       const mood = String(episodeForSpeak?.moodType || '').toLowerCase();
@@ -453,15 +449,67 @@ export default function RadioHost() {
       const pct = minPct + (span ? (seed % (span + 1)) : 0);
       return `+${pct}%`;
     };
+    const pickFormat = () => {
+      const now = Date.now();
+      const canNewsBlock = hostCandidates.length > 0 && (now - lastNewsBlockAtRef.current) >= (60 * 60 * 1000);
+      if (canNewsBlock && chance(0.65)) return 'news-block';
+      const roll = Math.random();
+      if (roll < 0.55) return 'track-intro';
+      if (roll < 0.8) return 'light-talk';
+      if (roll < 0.95) return 'news-joke';
+      return 'id-jingle';
+    };
 
-    // TTS только ru-RU (edge-tts) — «мультиязычный» анонс не озвучиваем, текст остаётся по-русски
-    if (langHint) {
-      scriptLines.push(`Новость с уклоном в тему языка — читаю анонс следующего трека по-русски.`);
-      scriptLines.push(announcement);
-      scriptLines.push(randPick(explainTemplates.ok));
+    const format = pickFormat();
+    const scriptLines = [];
+    if (episodeLine && chance(0.45)) scriptLines.push(episodeLine);
+
+    if (format === 'news-block') {
+      lastNewsBlockAtRef.current = Date.now();
+      lastFormatRef.current = 'news-block';
+      scriptLines.push(randPick([
+        'Всем привет, с вами ДИДЖЕЙ ИИ.',
+        'И как всегда с вами ДИДЖЕЙ ИИ, привет.',
+        'Привет, у микрофона ваш ДИДЖЕЙ ИИ.',
+        'На связи ДИДЖЕЙ ИИ, всем привет.'
+      ]));
+      scriptLines.push(buildDatePhrase());
+      scriptLines.push(buildWeatherPhrase());
+      scriptLines.push(randPick([
+        'А дальше у нас новости.',
+        'И теперь новости.',
+        'И у нас новостной блок.',
+        'Переходим в блок новостей.'
+      ]));
+      scriptLines.push(`В ленте обсуждают: “${newsTitle}”.`);
+      scriptLines.push(randPick([
+        'Это был новостной блок, а теперь возвращаемся к музыке.',
+        'На этом с новостями всё, продолжаем эфир.',
+        'Новости на паузу, треки на максимум.'
+      ]));
+      if (announceWithDjLead) scriptLines.push(randPick(djSelfTemplates));
+      scriptLines.push(randPick(trackLeadTemplates));
+    } else if (format === 'news-joke' && hostCandidates.length) {
+      lastFormatRef.current = 'news-joke';
+      scriptLines.push(randPick(newsJokeTemplates));
+      scriptLines.push(randPick(trackLeadTemplates));
+    } else if (format === 'id-jingle') {
+      lastFormatRef.current = 'id-jingle';
+      scriptLines.push(randPick(stationIdTemplates));
+      scriptLines.push(randPick(trackLeadTemplates));
+    } else if (format === 'light-talk') {
+      lastFormatRef.current = 'light-talk';
+      scriptLines.push(randPick(lightTalkTemplates));
+      scriptLines.push(randPick(trackLeadTemplates));
     } else {
-      scriptLines.push(announcement);
-      scriptLines.push(randPick(explainTemplates.noLang));
+      lastFormatRef.current = 'track-intro';
+      if (announceWithDjLead) scriptLines.push(randPick(djSelfTemplates));
+      scriptLines.push(randPick(trackLeadTemplates));
+      if (chance(0.55)) scriptLines.push(randPick(trackPunTemplates));
+    }
+
+    if (lastFormatRef.current !== 'news-block' && chance(0.08) && hostCandidates.length) {
+      scriptLines.push(`Кстати, в ленте мелькнул заголовок: “${newsTitle}”.`);
     }
 
     try {
