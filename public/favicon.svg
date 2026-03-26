@@ -5,9 +5,9 @@
       <stop offset="100%" stop-color="#080911"/>
     </linearGradient>
     <linearGradient id="nFill" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#f03cff"/>
-      <stop offset="55%" stop-color="#d300c5"/>
-      <stop offset="100%" stop-color="#8b0086"/>
+      <stop offset="0%" stop-color="#ff5a5a"/>
+      <stop offset="55%" stop-color="#ff2a2a"/>
+      <stop offset="100%" stop-color="#b80000"/>
     </linearGradient>
     <linearGradient id="sFill" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#9af8ff"/>
@@ -15,8 +15,8 @@
       <stop offset="100%" stop-color="#0397a3"/>
     </linearGradient>
     <filter id="nGlow" x="-40%" y="-40%" width="180%" height="180%">
-      <feDropShadow dx="0" dy="0" stdDeviation="1.6" flood-color="#d300c5" flood-opacity="0.85"/>
-      <feDropShadow dx="0" dy="0" stdDeviation="0.5" flood-color="#ffb8ff" flood-opacity="0.6"/>
+      <feDropShadow dx="0" dy="0" stdDeviation="1.6" flood-color="#ff2a2a" flood-opacity="0.85"/>
+      <feDropShadow dx="0" dy="0" stdDeviation="0.5" flood-color="#ffd1d1" flood-opacity="0.6"/>
     </filter>
     <filter id="sGlow" x="-40%" y="-40%" width="180%" height="180%">
       <feDropShadow dx="0" dy="0" stdDeviation="1.6" flood-color="#05d9e8" flood-opacity="0.85"/>
@@ -28,11 +28,11 @@
   <rect x="1.25" y="1.25" width="61.5" height="61.5" rx="12.3" fill="none" stroke="rgba(255,255,255,0.08)"/>
 
   <!-- N depth layer -->
-  <text x="2.8" y="57.4" font-family="Arial Black, Arial, sans-serif" font-size="66" fill="#5d004f" opacity="0.9">N</text>
+  <text x="2.8" y="57.4" font-family="Arial Black, Arial, sans-serif" font-size="66" fill="#6b0000" opacity="0.9">N</text>
   <!-- N main -->
   <text x="1.6" y="56.2" font-family="Arial Black, Arial, sans-serif" font-size="66" fill="url(#nFill)" filter="url(#nGlow)">N</text>
   <!-- N edge highlight -->
-  <text x="1.6" y="56.2" font-family="Arial Black, Arial, sans-serif" font-size="66" fill="none" stroke="#ffc7ff" stroke-width="0.85" opacity="0.4">N</text>
+  <text x="1.6" y="56.2" font-family="Arial Black, Arial, sans-serif" font-size="66" fill="none" stroke="#ffe0e0" stroke-width="0.85" opacity="0.4">N</text>
 
   <!-- S depth layer -->
   <text x="19.2" y="54.4" font-family="Arial Black, Arial, sans-serif" font-size="60" fill="#01616a" opacity="0.9">S</text>

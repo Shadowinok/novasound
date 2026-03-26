@@ -77,6 +77,11 @@
   letter-spacing: 0.06em;
 }
 
+.msk-clock--secondary {
+  opacity: 0.78;
+  font-size: 0.72rem;
+}
+
 .nav-link {
   color: var(--neon-cyan);
   font-weight: 500;

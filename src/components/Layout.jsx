@@ -17,6 +17,14 @@ export default function Layout() {
     return () => clearInterval(id);
   }, []);
 
+  const localTime = useMemo(() => {
+    try {
+      return new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date(now));
+    } catch {
+      return new Date(now).toLocaleTimeString('ru-RU');
+    }
+  }, [now]);
+
   const mskTime = useMemo(() => {
     try {
       return new Intl.DateTimeFormat('ru-RU', { timeZone: 'Europe/Moscow', hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date(now));
@@ -47,7 +55,8 @@ export default function Layout() {
               <h1 className="site-title">
                 <span className="neon-pink">Nova</span><span className="neon-cyan">Sound</span>
               </h1>
-              <span className="msk-clock">MSK {mskTime}</span>
+              <span className="msk-clock">LOCAL {localTime}</span>
+              <span className="msk-clock msk-clock--secondary">MSK эфир {mskTime}</span>
             </div>
           </div>
         </header>

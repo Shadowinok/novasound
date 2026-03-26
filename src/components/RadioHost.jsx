@@ -9,7 +9,7 @@ import { usePlayer } from '../context/PlayerContext';
  * React Strict Mode лишь в dev может дважды монтировать компоненты; production-сборка ведёт себя как один mount.
  */
 export default function RadioHost() {
-  const DJ_NAME = 'ДИДЖЕЙ И-И';
+  const DJ_NAME = 'ЗЕРО';
   const {
     currentTrack,
     queue,
@@ -27,6 +27,14 @@ export default function RadioHost() {
   } = usePlayer();
 
   const [hostNews, setHostNews] = useState([]);
+  const [hostLinePool, setHostLinePool] = useState({
+    joke: [],
+    fact: [],
+    'news-bridge': [],
+    'news-outro': [],
+    'track-next': [],
+    'track-current': []
+  });
   const [hostSchedule, setHostSchedule] = useState({
     mode: 'fixed',
     fixedEverySongs: 2,
@@ -85,6 +93,41 @@ export default function RadioHost() {
     } catch (_) {}
   }, []);
 
+  const loadHostLines = useCallback(async () => {
+    try {
+      const { data } = await client.get('/announcements/host-lines', {
+        params: {
+          types: 'joke,fact,news-bridge,news-outro,track-next,track-current',
+          limitPerType: 80
+        }
+      });
+      const items = data?.items || {};
+      const normalizePool = (list) => (Array.isArray(list) ? list : [])
+        .map((x) => {
+          if (!x) return null;
+          if (typeof x === 'string') return { text: x, mood: 'neutral', cue: 'none', rateMin: 6, rateMax: 14 };
+          const text = String(x.text || '').trim();
+          if (!text) return null;
+          return {
+            text,
+            mood: String(x.mood || 'neutral'),
+            cue: String(x.cue || 'none'),
+            rateMin: Number.isFinite(Number(x.rateMin)) ? Number(x.rateMin) : 6,
+            rateMax: Number.isFinite(Number(x.rateMax)) ? Number(x.rateMax) : 14
+          };
+        })
+        .filter(Boolean);
+      setHostLinePool({
+        joke: normalizePool(items?.joke),
+        fact: normalizePool(items?.fact),
+        'news-bridge': normalizePool(items?.['news-bridge']),
+        'news-outro': normalizePool(items?.['news-outro']),
+        'track-next': normalizePool(items?.['track-next']),
+        'track-current': normalizePool(items?.['track-current'])
+      });
+    } catch (_) {}
+  }, []);
+
   const loadDjEpisode = useCallback(async () => {
     if (!isRadioMode) return;
     try {
@@ -100,6 +143,12 @@ export default function RadioHost() {
       if (hostTimerRef.current) window.clearInterval(hostTimerRef.current);
     };
   }, [loadHostNews]);
+
+  useEffect(() => {
+    loadHostLines();
+    const id = window.setInterval(loadHostLines, 10 * 60 * 1000);
+    return () => window.clearInterval(id);
+  }, [loadHostLines]);
 
   useEffect(() => {
     if (!isRadioMode) {
@@ -422,6 +471,42 @@ export default function RadioHost() {
     const nextAuthorSpoken = transcribeNickToSpokenRu(nextAuthorRaw);
     const randPick = (arr) => arr[Math.floor(Math.random() * arr.length)];
     const chance = (p) => Math.random() < p;
+    const rateHints = [];
+    const withCue = (text, cue) => {
+      if (!text) return text;
+      if (cue === 'smile' && chance(0.2)) {
+        return `${randPick(['Ну что ж,', 'Улыбнусь и скажу,', 'С лёгкой улыбкой:'])} ${text}`;
+      }
+      if (cue === 'serious' && chance(0.18)) {
+        return `${randPick(['Если по делу,', 'Если серьёзно,', 'Без лишнего пафоса,'])} ${text}`;
+      }
+      return text;
+    };
+    const pickPoolEntry = (type, fallbackText) => {
+      const list = Array.isArray(hostLinePool?.[type]) ? hostLinePool[type].filter(Boolean) : [];
+      const entry = list.length ? randPick(list) : {
+        text: String(fallbackText || ''),
+        mood: 'neutral',
+        cue: 'none',
+        rateMin: 6,
+        rateMax: 14
+      };
+      const min = Number(entry.rateMin);
+      const max = Number(entry.rateMax);
+      if (Number.isFinite(min) && Number.isFinite(max)) {
+        const lo = Math.max(0, Math.min(min, max));
+        const hi = Math.max(lo, Math.max(min, max));
+        rateHints.push(lo + Math.floor(Math.random() * (hi - lo + 1)));
+      }
+      return entry;
+    };
+    const fillVars = (line, vars = {}, cue = 'none') => {
+      let out = String(line || '').trim();
+      Object.entries(vars).forEach(([k, v]) => {
+        out = out.replaceAll(`{${k}}`, String(v || ''));
+      });
+      return withCue(out, cue);
+    };
     const newsTitle = String(bestTitle).slice(0, 120);
 
     const trackTitleNorm = String(nextTitle || '').trim() || 'следующий трек';
@@ -466,18 +551,13 @@ export default function RadioHost() {
       `${DJ_NAME} в эфире, продолжаем.`
     ];
 
+    const trackNextEntry = pickPoolEntry('track-next', `Дальше у нас ${trackWithMaybeAuthor}.`);
+    const trackCurrentEntry = pickPoolEntry('track-current', `Сейчас в эфире ${currentTitle}.`);
     const trackLeadFutureTemplates = [
-      `Дальше у нас ${trackWithMaybeAuthor}.`,
-      `Следом в эфире ${trackWithMaybeAuthor}.`,
-      `Сейчас поставлю ${trackWithMaybeAuthor}.`,
-      `Лови следующий трек: ${trackWithMaybeAuthor}.`,
-      `На очереди ${trackWithMaybeAuthor}.`,
-      `Следующей мы послушаем ${trackWithMaybeAuthor}.`
+      fillVars(trackNextEntry.text, { track: trackWithMaybeAuthor }, trackNextEntry.cue)
     ];
     const trackLeadCurrentTemplates = [
-      `Сейчас в эфире ${currentTitle}.`,
-      `Прямо сейчас играет ${currentTitle}.`,
-      `Сейчас слушаем ${currentTitle}.`
+      fillVars(trackCurrentEntry.text, { track: currentTitle }, trackCurrentEntry.cue)
     ];
 
     const trackPunTemplates = [
@@ -660,7 +740,11 @@ export default function RadioHost() {
       let seed = 0;
       for (const ch of seedSrc) seed = (seed * 33 + ch.charCodeAt(0)) >>> 0;
       const span = Math.max(0, maxPct - minPct);
-      const pct = minPct + (span ? (seed % (span + 1)) : 0);
+      let pct = minPct + (span ? (seed % (span + 1)) : 0);
+      if (rateHints.length) {
+        const hinted = rateHints[Math.floor(Math.random() * rateHints.length)];
+        pct = Math.round((pct * 0.6) + (hinted * 0.4));
+      }
       return `+${pct}%`;
     };
     const pickFormat = () => {
@@ -724,7 +808,10 @@ export default function RadioHost() {
           ];
           const line = idx === newsItemsForBlock.length - 2
             ? `И под финал новостного блока: “${title}”.`
-            : randPick(bridgeTemplates);
+            : (() => {
+              const entry = pickPoolEntry('news-bridge', randPick(bridgeTemplates));
+              return fillVars(entry.text, { title }, entry.cue);
+            })();
           scriptLines.push(line);
         });
       } else {
@@ -740,13 +827,22 @@ export default function RadioHost() {
         'С новостями разобрались, продолжаем наш музыкальный маршрут.',
         'Информационный блок завершён, дальше только музыка и настроение.'
       ];
-      scriptLines.push(randPick(postNewsOutroTemplates));
-      if (chance(0.45)) scriptLines.push(randPick(shortIronicFacts));
+      {
+        const entry = pickPoolEntry('news-outro', randPick(postNewsOutroTemplates));
+        scriptLines.push(fillVars(entry.text, {}, entry.cue));
+      }
+      if (chance(0.45)) {
+        const entry = pickPoolEntry('fact', randPick(shortIronicFacts));
+        scriptLines.push(fillVars(entry.text, {}, entry.cue));
+      }
       if (announceWithDjLead) scriptLines.push(randPick(djSelfTemplates));
       scriptLines.push(wrapWithFreshTrack(randPick(trackLeadFutureTemplates)));
     } else if (format === 'news-joke' && hostCandidates.length) {
       lastFormatRef.current = 'news-joke';
-      scriptLines.push(randPick(newsJokeTemplates));
+      {
+        const entry = pickPoolEntry('joke', randPick(newsJokeTemplates));
+        scriptLines.push(fillVars(entry.text, {}, entry.cue));
+      }
       scriptLines.push(newsCommentaryBuild());
       if (announceMode === 'future') scriptLines.push(wrapWithFreshTrack(randPick(trackLeadFutureTemplates)));
       else scriptLines.push(programListLine);
@@ -793,7 +889,10 @@ export default function RadioHost() {
       ]));
     }
     if (lastFormatRef.current !== 'news-block' && chance(0.12)) {
-      scriptLines.push(randPick(shortIronicFacts));
+      {
+        const entry = pickPoolEntry('fact', randPick(shortIronicFacts));
+        scriptLines.push(fillVars(entry.text, {}, entry.cue));
+      }
     }
 
     try {
@@ -874,6 +973,8 @@ export default function RadioHost() {
     setDjEpisode
     ,
     advanceRadioAfterHost
+    ,
+    hostLinePool
   ]);
 
   const scheduleSpeakForTrack = useCallback(() => {
