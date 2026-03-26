@@ -68,7 +68,7 @@ export default function GuestRadioMiniPlayer() {
         <span className={`guest-mini-player__dot ${loading ? 'is-loading' : ''}`} />
       </div>
       <div className="guest-mini-player__ticker-wrap">
-        <div className="guest-mini-player__ticker">{title} • {title} •</div>
+        <div className="guest-mini-player__ticker">{title}</div>
       </div>
     </div>
   );
