@@ -15,6 +15,7 @@ export default function RadioHost() {
     queueIndex,
     isRadioMode,
     playing,
+    volume,
     applyMusicDuck,
     releaseMusicDuck
   } = usePlayer();
@@ -37,6 +38,8 @@ export default function RadioHost() {
   const spokenTitlesRef = useRef([]);
   /** Музыка тише голоса ведущего (только gain элемента Audio; ползунок — громкость пользователя) */
   const DUCK_MUSIC_FACTOR = 0.09;
+  /** Громкость голоса ведущего относительно пользовательской громкости плеера */
+  const HOST_VOICE_FACTOR = 0.72;
   const hostTrackCounterRef = useRef(0);
   const lastCountedSlotKeyRef = useRef('');
   const hostNextAfterTracksRef = useRef(2);
@@ -143,6 +146,13 @@ export default function RadioHost() {
   const transcribeNickToSpokenRu = (nick) => {
     const s = String(nick || '').trim();
     if (!s) return s;
+    // Частый кейс: DJ. Rex / D.J Rex -> "ДИДЖЕЙ РЕКС"
+    const djMatch = s.match(/^\s*d\.?\s*j\.?\s*[\s._-]*(.+)?$/i);
+    if (djMatch) {
+      const tail = String(djMatch[1] || '').trim();
+      if (!tail) return 'ДИДЖЕЙ';
+      return `ДИДЖЕЙ ${transcribeNickToSpokenRu(tail)}`.trim();
+    }
     if (/[А-Яа-яЁё]/.test(s)) return s.toUpperCase();
     const map = {
       A: 'А', B: 'Б', C: 'С', D: 'Д', E: 'Е', F: 'Ф', G: 'Г', H: 'Х', I: 'И', J: 'Й',
@@ -193,6 +203,9 @@ export default function RadioHost() {
               ttsAudioRef.current = null;
             }
             const audio = new Audio(blobUrl);
+            // Не 100%: привязываем голос к пользовательской громкости.
+            const hostGain = Math.max(0.14, Math.min(1, Number(volume) * HOST_VOICE_FACTOR));
+            audio.volume = hostGain;
             ttsAudioRef.current = audio;
             audio.onended = () => {
               URL.revokeObjectURL(blobUrl);
@@ -202,10 +215,13 @@ export default function RadioHost() {
               URL.revokeObjectURL(blobUrl);
               resolve(false);
             };
-            audio.play().catch(() => {
-              URL.revokeObjectURL(blobUrl);
-              resolve(false);
-            });
+            const maybePromise = audio.play();
+            if (maybePromise && typeof maybePromise.then === 'function') {
+              maybePromise.catch(() => {
+                URL.revokeObjectURL(blobUrl);
+                resolve(false);
+              });
+            }
           } catch (_) {
             URL.revokeObjectURL(blobUrl);
             resolve(false);
@@ -463,6 +479,7 @@ export default function RadioHost() {
     queue,
     queueIndex,
     releaseMusicDuck,
+    volume,
     djEpisode,
     setDjEpisode
   ]);
