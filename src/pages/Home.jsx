@@ -4,9 +4,12 @@ import { motion } from 'framer-motion';
 import client from '../api/client';
 import { charts, playlists } from '../api/client';
 import TrackCard from '../components/TrackCard';
+import GuestRadioMiniPlayer from '../components/GuestRadioMiniPlayer';
+import { useAuth } from '../context/AuthContext';
 import { coverImageBackgroundStyle } from '../utils/coverImage';
 
 export default function Home() {
+  const { user } = useAuth();
   const [latest, setLatest] = useState([]);
   const [popular, setPopular] = useState([]);
   const [playlistList, setPlaylistList] = useState([]);
@@ -143,6 +146,11 @@ export default function Home() {
           <span className="hero-sub-line hero-sub-line--lead">Площадка про нейросети и музыку</span>
           <span className="hero-sub-line">слушай, загружай, смотри чарты</span>
         </div>
+        {!user && (
+          <div className="hero-mini-player">
+            <GuestRadioMiniPlayer />
+          </div>
+        )}
       </section>
       {tickerSegments.length > 0 && (
         <section className="news-ticker-section" aria-label="Новостная лента">
@@ -195,6 +203,13 @@ export default function Home() {
           text-align: center;
           padding: 48px 24px;
           margin-bottom: 40px;
+          position: relative;
+        }
+        .hero-mini-player {
+          position: absolute;
+          right: 0;
+          top: 8px;
+          width: 240px;
         }
         .hero-title {
           font-family: var(--font-display);
@@ -230,6 +245,88 @@ export default function Home() {
         }
         .hero-sub-line--lead {
           font-weight: 600;
+        }
+        .guest-mini-player {
+          border: 1px solid rgba(5, 217, 232, 0.35);
+          background: rgba(8, 12, 24, 0.9);
+          border-radius: 10px;
+          padding: 8px 10px 6px;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          box-shadow: 0 0 20px rgba(5, 217, 232, 0.1);
+        }
+        .guest-mini-player__btn {
+          align-self: center;
+          width: 34px;
+          height: 34px;
+          border-radius: 50%;
+          border: 1px solid rgba(255, 42, 109, 0.6);
+          background: rgba(255, 42, 109, 0.15);
+          color: var(--neon-pink);
+          font-size: 0.95rem;
+          line-height: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .guest-mini-player__progress {
+          position: relative;
+          height: 6px;
+          border-radius: 999px;
+          background: rgba(255, 255, 255, 0.12);
+          overflow: hidden;
+        }
+        .guest-mini-player__load {
+          position: absolute;
+          left: 0;
+          top: 0;
+          bottom: 0;
+          background: rgba(5, 217, 232, 0.35);
+        }
+        .guest-mini-player__play {
+          position: absolute;
+          left: 0;
+          top: 0;
+          bottom: 0;
+          background: rgba(5, 217, 232, 0.95);
+        }
+        .guest-mini-player__dot {
+          position: absolute;
+          right: 3px;
+          top: 50%;
+          width: 8px;
+          height: 8px;
+          margin-top: -4px;
+          border-radius: 50%;
+          background: var(--neon-cyan);
+          box-shadow: 0 0 8px rgba(5, 217, 232, 0.8);
+        }
+        .guest-mini-player__dot.is-loading {
+          animation: miniPulse .9s ease-in-out infinite;
+        }
+        @keyframes miniPulse {
+          0%, 100% { transform: scale(0.85); opacity: 0.6; }
+          50% { transform: scale(1.12); opacity: 1; }
+        }
+        .guest-mini-player__ticker-wrap {
+          width: 100%;
+          overflow: hidden;
+          border-top: 1px solid rgba(255, 255, 255, 0.14);
+          padding-top: 5px;
+        }
+        .guest-mini-player__ticker {
+          white-space: nowrap;
+          display: inline-block;
+          color: var(--neon-cyan);
+          font-size: 0.76rem;
+          line-height: 1.2;
+          text-shadow: 0 0 10px rgba(5, 217, 232, 0.35);
+          animation: miniTicker 16s linear infinite;
+        }
+        @keyframes miniTicker {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
         }
         .section-title {
           font-size: 1.3rem;
@@ -331,6 +428,14 @@ export default function Home() {
         }
         @media (prefers-reduced-motion: reduce) {
           .news-ticker-track { animation: none; }
+          .guest-mini-player__ticker { animation: none; }
+        }
+        @media (max-width: 1024px) {
+          .hero-mini-player {
+            position: static;
+            margin: 14px auto 0;
+            width: min(280px, 90%);
+          }
         }
       `}</style>
     </motion.div>
