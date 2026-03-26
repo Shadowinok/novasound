@@ -55,11 +55,26 @@ export default function RadioHost() {
   const hostTrackCounterRef = useRef(0);
   const lastCountedSlotKeyRef = useRef('');
   const hostNextAfterTracksRef = useRef(2);
+  const livePlaybackSlotKeyRef = useRef('');
+  const liveIsRadioModeRef = useRef(false);
+  const livePlayingRef = useRef(false);
 
   const activeNow = isRadioMode && currentTrack ? currentTrack : null;
   const currentTrackId = currentTrack?._id ? String(currentTrack._id) : '';
   /** Уникальный слот воспроизведения: один и тот же трек может быть в очереди дважды под разными индексами */
   const playbackSlotKey = currentTrackId ? `${queueIndex}-${currentTrackId}` : '';
+
+  useEffect(() => {
+    livePlaybackSlotKeyRef.current = playbackSlotKey;
+  }, [playbackSlotKey]);
+
+  useEffect(() => {
+    liveIsRadioModeRef.current = isRadioMode;
+  }, [isRadioMode]);
+
+  useEffect(() => {
+    livePlayingRef.current = playing;
+  }, [playing]);
 
   const loadHostNews = useCallback(async () => {
     try {
@@ -213,6 +228,11 @@ export default function RadioHost() {
               try { ttsAudioRef.current.pause(); } catch (_) {}
               ttsAudioRef.current = null;
             }
+            if (typeof hooks.shouldAbortBeforePlay === 'function' && hooks.shouldAbortBeforePlay()) {
+              URL.revokeObjectURL(blobUrl);
+              resolve(false);
+              return;
+            }
             const audio = new Audio(blobUrl);
             // Не 100%: привязываем голос к пользовательской громкости.
             const hostGain = Math.max(0.14, Math.min(1, Number(volume) * HOST_VOICE_FACTOR));
@@ -229,6 +249,11 @@ export default function RadioHost() {
             audio.onplay = () => {
               if (typeof hooks.onPlaybackStart === 'function') hooks.onPlaybackStart();
             };
+            if (typeof hooks.shouldAbortBeforePlay === 'function' && hooks.shouldAbortBeforePlay()) {
+              URL.revokeObjectURL(blobUrl);
+              resolve(false);
+              return;
+            }
             const maybePromise = audio.play();
             if (maybePromise && typeof maybePromise.then === 'function') {
               maybePromise.catch(() => {
@@ -634,16 +659,31 @@ export default function RadioHost() {
     const pickFormat = () => {
       if (forceFormat) return forceFormat;
       const roll = Math.random();
-      if (roll < 0.47) return 'track-intro';
-      if (roll < 0.67) return 'light-talk';
-      if (roll < 0.82) return 'program-list';
-      if (roll < 0.95) return 'news-joke';
-      return 'id-jingle';
+      const variants = [];
+      if (roll < 0.45) variants.push('track-intro');
+      else if (roll < 0.64) variants.push('light-talk');
+      else if (roll < 0.79) variants.push('program-list');
+      else if (roll < 0.93) variants.push('news-joke');
+      else variants.push('id-jingle');
+      variants.push('track-intro', 'light-talk', 'program-list', 'news-joke', 'id-jingle');
+      const prev = lastFormatRef.current;
+      return variants.find((f) => f !== prev) || variants[0];
     };
 
     const format = pickFormat();
     const scriptLines = [];
     if (episodeLine && chance(0.45)) scriptLines.push(episodeLine);
+    const wrapWithFreshTrack = (line) => {
+      if (announceMode !== 'future') return line;
+      if (!line) return line;
+      // Пересобираем строку перед озвучкой, если "следующий" уже изменился.
+      const liveQueue = Array.isArray(queue) ? queue : [];
+      const liveIdx = Math.max(0, Number(queueIndex) || 0);
+      const liveNext = liveQueue[liveIdx + 1];
+      const liveNextTitle = String(liveNext?.title || '').trim();
+      if (!liveNextTitle || liveNextTitle === trackTitleNorm) return line;
+      return line.replace(trackTitleNorm, liveNextTitle);
+    };
 
     if (format === 'news-block') {
       lastNewsBlockAtRef.current = Date.now();
@@ -681,22 +721,22 @@ export default function RadioHost() {
       ]));
       if (chance(0.45)) scriptLines.push(randPick(shortIronicFacts));
       if (announceWithDjLead) scriptLines.push(randPick(djSelfTemplates));
-      scriptLines.push(randPick(trackLeadFutureTemplates));
+      scriptLines.push(wrapWithFreshTrack(randPick(trackLeadFutureTemplates)));
     } else if (format === 'news-joke' && hostCandidates.length) {
       lastFormatRef.current = 'news-joke';
       scriptLines.push(randPick(newsJokeTemplates));
       scriptLines.push(newsCommentaryBuild());
-      if (announceMode === 'future') scriptLines.push(randPick(trackLeadFutureTemplates));
+      if (announceMode === 'future') scriptLines.push(wrapWithFreshTrack(randPick(trackLeadFutureTemplates)));
       else scriptLines.push(programListLine);
     } else if (format === 'id-jingle') {
       lastFormatRef.current = 'id-jingle';
       scriptLines.push(randPick(stationIdTemplates));
-      if (announceMode === 'future') scriptLines.push(randPick(trackLeadFutureTemplates));
+      if (announceMode === 'future') scriptLines.push(wrapWithFreshTrack(randPick(trackLeadFutureTemplates)));
       else scriptLines.push(programListLine);
     } else if (format === 'light-talk') {
       lastFormatRef.current = 'light-talk';
       scriptLines.push(randPick(lightTalkTemplates));
-      if (announceMode === 'future') scriptLines.push(randPick(trackLeadFutureTemplates));
+      if (announceMode === 'future') scriptLines.push(wrapWithFreshTrack(randPick(trackLeadFutureTemplates)));
       else scriptLines.push(programListLine);
     } else if (format === 'program-list') {
       lastFormatRef.current = 'program-list';
@@ -713,7 +753,7 @@ export default function RadioHost() {
       lastFormatRef.current = 'track-intro';
       if (announceWithDjLead) scriptLines.push(randPick(djSelfTemplates));
       if (announceMode === 'future') {
-        scriptLines.push(randPick(trackLeadFutureTemplates));
+        scriptLines.push(wrapWithFreshTrack(randPick(trackLeadFutureTemplates)));
       } else {
         scriptLines.push(randPick(trackLeadCurrentTemplates));
         scriptLines.push(programListLine);
@@ -745,8 +785,20 @@ export default function RadioHost() {
         .filter(Boolean)
         .join(' ');
       let duckApplied = false;
+      const isOutdatedSpeech = () => (
+        !liveIsRadioModeRef.current
+        || !livePlayingRef.current
+        || !livePlaybackSlotKeyRef.current
+        || livePlaybackSlotKeyRef.current !== trackKey
+      );
+      if (isOutdatedSpeech()) {
+        hostPlayingRef.current = false;
+        return;
+      }
       const played = await speakLine(fullScript, pickRateByVibe(), {
+        shouldAbortBeforePlay: isOutdatedSpeech,
         onPlaybackStart: () => {
+          if (isOutdatedSpeech()) return;
           if (duckApplied) return;
           duckApplied = true;
           applyMusicDuck(duckFactor);
@@ -866,8 +918,8 @@ export default function RadioHost() {
       if (hostPlayingRef.current) return;
       const now = new Date();
       if (now.getMinutes() !== 0) return;
-      // Узкое окно старта блока "по часам".
-      if (now.getSeconds() > 8) return;
+      // Стартуем в начале часа; расширяем окно, чтобы не пропускать блок при фоне вкладки.
+      if (now.getSeconds() > 45) return;
       const hourKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}-${now.getHours()}`;
       if (lastHourlyNewsKeyRef.current === hourKey) return;
       lastHourlyNewsKeyRef.current = hourKey;
