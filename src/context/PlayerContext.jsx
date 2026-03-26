@@ -265,7 +265,13 @@ export function PlayerProvider({ children }) {
       setRepeatMode('all');
     }
     const q = normalizeQueue(options.queue, track);
-    let idx = Number.isFinite(options.startIndex) ? Number(options.startIndex) : q.findIndex((t) => String(t?._id) === String(track._id));
+    const trackId = String(track?._id || '');
+    const foundIdx = q.findIndex((t) => String(t?._id) === trackId);
+    let idx = Number.isFinite(options.startIndex) ? Number(options.startIndex) : foundIdx;
+    // Защита от рассинхрона: если startIndex указывает не на тот трек, используем фактический индекс track в очереди.
+    if (idx >= 0 && idx < q.length && String(q[idx]?._id || '') !== trackId && foundIdx >= 0) {
+      idx = foundIdx;
+    }
     if (idx < 0) idx = 0;
     playQueueTrack(q[idx] || track, q, idx, {
       startAtSec: options.startAtSec,
@@ -445,7 +451,8 @@ export function PlayerProvider({ children }) {
             const q = Array.isArray(data?.queue) ? data.queue : [];
             const startAtSec = Number(data?.nowOffsetSec) || 0;
             if (now && q.length) {
-              loadTrack(now, { queue: q, startIndex: 0, isRadio: true, isRadioPublic, startAtSec });
+              const nowIdx = q.findIndex((t) => String(t?._id) === String(now?._id));
+              loadTrack(now, { queue: q, startIndex: nowIdx >= 0 ? nowIdx : 0, isRadio: true, isRadioPublic, startAtSec });
               return;
             }
             desiredPlayingRef.current = true;
