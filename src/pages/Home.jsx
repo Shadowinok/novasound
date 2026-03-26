@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import client from '../api/client';
-import { charts, playlists } from '../api/client';
+import { charts, playlists, tracks as tracksApi } from '../api/client';
 import TrackCard from '../components/TrackCard';
 import GuestRadioMiniPlayer from '../components/GuestRadioMiniPlayer';
 import { useAuth } from '../context/AuthContext';
@@ -14,6 +14,7 @@ export default function Home() {
   const [popular, setPopular] = useState([]);
   const [playlistList, setPlaylistList] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
+  const [radioNow, setRadioNow] = useState(null);
 
   useEffect(() => {
     let alive = true;
@@ -25,12 +26,24 @@ export default function Home() {
           setAnnouncements(Array.isArray(r.data?.items) ? r.data.items : []);
         })
         .catch(() => {});
+    const loadRadioNow = () =>
+      tracksApi.radioNow({ limit: 20 })
+        .then((r) => {
+          if (!alive) return;
+          setRadioNow(r.data?.now || null);
+        })
+        .catch(() => {
+          if (!alive) return;
+          setRadioNow(null);
+        });
 
     client.get('/tracks', { params: { limit: 8, sort: '-createdAt' } }).then(r => setLatest(r.data.tracks || [])).catch(() => {});
     charts.weekly().then(r => setPopular((r.data || []).slice(0, 6))).catch(() => {});
 
     loadAnnouncements();
+    loadRadioNow();
     const t = window.setInterval(loadAnnouncements, 20000);
+    const tr = window.setInterval(loadRadioNow, 20000);
 
     playlists
       .featured(6)
@@ -48,6 +61,7 @@ export default function Home() {
     return () => {
       alive = false;
       window.clearInterval(t);
+      window.clearInterval(tr);
     };
   }, []);
 
@@ -55,8 +69,7 @@ export default function Home() {
     const items = Array.isArray(announcements) ? announcements : [];
     const segments = items
       .map((a) => {
-        if (a.kind === 'radio') return { kind: 'radio', text: `В эфире: ${a.title}` };
-        if (a.kind === 'radio-offline') return { kind: 'radio-offline', text: 'Эфир оффлайн' };
+        if (a.kind === 'radio' || a.kind === 'radio-offline') return null;
         if (a.kind === 'announcement') {
           const msg = a.message ? ` — ${String(a.message).trim()}` : '';
           return { kind: 'announcement', text: `Анонс: ${a.title}${msg}` };
@@ -114,11 +127,15 @@ export default function Home() {
       'releases-news': 190,
       'new-track': 120
     };
-    return segments.map((s) => {
+    const normalized = segments.map((s) => {
       const max = maxByKind[s.kind] ?? 160;
       return { ...s, text: String(s.text).slice(0, max) };
     });
-  }, [announcements]);
+    const radioSeg = radioNow?.title
+      ? { kind: 'radio', text: `В эфире: ${String(radioNow.title).slice(0, 140)}` }
+      : { kind: 'radio-offline', text: 'Эфир оффлайн' };
+    return [radioSeg, ...normalized];
+  }, [announcements, radioNow]);
 
   const renderTickerSequence = (loopIdx) => {
     const seq = [];
