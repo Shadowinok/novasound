@@ -19,7 +19,9 @@ export default function RadioHost() {
     duration,
     volume,
     applyMusicDuck,
-    releaseMusicDuck
+    releaseMusicDuck,
+    pauseForHost,
+    resumeAfterHost
   } = usePlayer();
 
   const [hostNews, setHostNews] = useState([]);
@@ -190,7 +192,7 @@ export default function RadioHost() {
     return s;
   };
 
-  const speakLine = (text, rate = '+0%') => {
+  const speakLine = (text, rate = '+0%', hooks = {}) => {
     if (!text) return Promise.resolve(false);
     const voicePool = ['ru-RU-DmitryNeural', 'ru-RU-MaximNeural', 'ru-RU-PavelNeural'];
     const tryVoice = (idx) => {
@@ -223,6 +225,9 @@ export default function RadioHost() {
             audio.onerror = () => {
               URL.revokeObjectURL(blobUrl);
               resolve(false);
+            };
+            audio.onplay = () => {
+              if (typeof hooks.onPlaybackStart === 'function') hooks.onPlaybackStart();
             };
             const maybePromise = audio.play();
             if (maybePromise && typeof maybePromise.then === 'function') {
@@ -325,6 +330,7 @@ export default function RadioHost() {
     const duckFactor = Math.max(0, Math.min(1, Number(opts.duckFactor ?? DUCK_MUSIC_FACTOR)));
     const forceFormat = String(opts.forceFormat || '');
     const announceMode = String(opts.announceMode || 'future');
+    const pauseMusic = Boolean(opts.pauseMusic);
     if (!isRadioMode) return;
     if (!playing) return;
     if (!activeNow) return;
@@ -732,13 +738,20 @@ export default function RadioHost() {
       if (hostPlayingRef.current) return;
       hostPlayingRef.current = true;
       if (forceFormat === 'news-block') startNewsBed();
-      applyMusicDuck(duckFactor);
+      if (pauseMusic && isRadioMode) pauseForHost();
       // Один запрос вместо серии фраз: меньше сетевых пауз между репликами.
       const fullScript = scriptLines
         .map((line) => String(line || '').trim())
         .filter(Boolean)
         .join(' ');
-      const played = await speakLine(fullScript, pickRateByVibe());
+      let duckApplied = false;
+      const played = await speakLine(fullScript, pickRateByVibe(), {
+        onPlaybackStart: () => {
+          if (duckApplied) return;
+          duckApplied = true;
+          applyMusicDuck(duckFactor);
+        }
+      });
       if (played) {
         lastSpokenKeyRef.current = trackKey;
         if (shouldAnnounceEpisode) {
@@ -755,6 +768,7 @@ export default function RadioHost() {
     } catch (_) {
       // TTS недоступен
     } finally {
+      if (pauseMusic && isRadioMode) resumeAfterHost();
       releaseMusicDuck();
       if (forceFormat === 'news-block') stopNewsBed();
       hostPlayingRef.current = false;
@@ -769,7 +783,9 @@ export default function RadioHost() {
     playbackSlotKey,
     queue,
     queueIndex,
+    pauseForHost,
     releaseMusicDuck,
+    resumeAfterHost,
     startNewsBed,
     stopNewsBed,
     volume,
@@ -791,14 +807,17 @@ export default function RadioHost() {
     let delayMs = 700;
     let duckFactor = DUCK_MUSIC_FACTOR;
     let announceMode = 'future';
+    let pauseMusic = false;
     if (roll < 0.3) {
       delayMs = 700;
       duckFactor = 0.1;
       announceMode = 'program';
     } else if (roll < 0.5) {
-      delayMs = 650;
-      duckFactor = 0.01;
+      // Вариант "между песнями без наложения": ставим музыку на паузу, говорим, продолжаем.
+      delayMs = Math.max(350, Math.min(12000, (remainingSec - 0.9) * 1000));
+      duckFactor = 0;
       announceMode = 'program';
+      pauseMusic = true;
     } else if (roll < 0.7) {
       delayMs = Math.max(450, Math.min(14000, (remainingSec - 2.2) * 1000));
       duckFactor = 0.09;
@@ -811,7 +830,7 @@ export default function RadioHost() {
     if (!Number.isFinite(delayMs) || delayMs < 0) delayMs = 700;
     speakScheduleTimerRef.current = window.setTimeout(() => {
       speakScheduleTimerRef.current = null;
-      void speakHostForTrack({ duckFactor, announceMode });
+      void speakHostForTrack({ duckFactor, announceMode, pauseMusic });
     }, delayMs);
   }, [DUCK_MUSIC_FACTOR, currentTrack?.duration, duration, progress, speakHostForTrack]);
 
