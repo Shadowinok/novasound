@@ -63,6 +63,9 @@ export default function RadioHost() {
   const newsBedMasterGainRef = useRef(null);
   const newsBedNodesRef = useRef([]);
   const newsBedPulseTimerRef = useRef(null);
+  const hostEventQueueRef = useRef([]);
+  const hostEventBusyRef = useRef(false);
+  const hostEventPumpTimerRef = useRef(null);
   const hostTrackCounterRef = useRef(0);
   const lastCountedSlotKeyRef = useRef('');
   const hostNextAfterTracksRef = useRef(2);
@@ -221,6 +224,43 @@ export default function RadioHost() {
     if (t.includes('удмурт')) return { label: 'удмуртском' };
     if (t.includes('англий')) return { label: 'английском' };
     return null;
+  };
+
+  const getMskClockParts = () => {
+    try {
+      const fmt = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Europe/Moscow',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      });
+      const parts = fmt.formatToParts(new Date());
+      const pick = (type) => parts.find((p) => p.type === type)?.value || '';
+      return {
+        year: Number(pick('year')) || 0,
+        month: Number(pick('month')) || 0,
+        day: Number(pick('day')) || 0,
+        hour: Number(pick('hour')) || 0,
+        minute: Number(pick('minute')) || 0,
+        second: Number(pick('second')) || 0
+      };
+    } catch (_) {
+      const d = new Date();
+      const utcMs = d.getTime() + d.getTimezoneOffset() * 60000;
+      const msk = new Date(utcMs + (3 * 60 * 60000));
+      return {
+        year: msk.getFullYear(),
+        month: msk.getMonth() + 1,
+        day: msk.getDate(),
+        hour: msk.getHours(),
+        minute: msk.getMinutes(),
+        second: msk.getSeconds()
+      };
+    }
   };
 
   const transcribeNickToSpokenRu = (nick) => {
@@ -602,6 +642,13 @@ export default function RadioHost() {
       .filter((x) => String(x?.title || '').trim())
       .slice(0, 5)
       .map((x) => String(x.title).slice(0, 140));
+    const blockLabel = (id) => {
+      if (id === 'morning') return 'утренний вайб';
+      if (id === 'day') return 'дневной эфир';
+      if (id === 'evening') return 'вечерний разгон';
+      if (id === 'night') return 'ночной релакс';
+      return 'обычный эфир';
+    };
     const shortIronicFacts = [
       'будильник всегда звонит на самом интересном месте сна.',
       'очередь в магазине обычно быстрее двигается в соседней кассе.',
@@ -793,7 +840,27 @@ export default function RadioHost() {
       return line.replace(trackTitleNorm, liveNextTitle);
     };
 
-    if (format === 'news-block') {
+    if (format === 'block-switch') {
+      lastFormatRef.current = 'block-switch';
+      const prevBlockId = String(opts.prevBlockId || '');
+      const nextBlockId = String(opts.nextBlockId || '');
+      if (prevBlockId && nextBlockId && prevBlockId !== nextBlockId) {
+        scriptLines.push(randPick([
+          `Плавно выходим из блока «${blockLabel(prevBlockId)}».`,
+          `Завершаем сегмент «${blockLabel(prevBlockId)}».`,
+          `Смена эфирного настроения: закрываем «${blockLabel(prevBlockId)}».`
+        ]));
+      }
+      if (nextBlockId) {
+        scriptLines.push(randPick([
+          `Переходим в «${blockLabel(nextBlockId)}».`,
+          `Включаем режим «${blockLabel(nextBlockId)}».`,
+          `Следующий участок эфира: «${blockLabel(nextBlockId)}».`
+        ]));
+      }
+      if (announceMode === 'future') scriptLines.push(wrapWithFreshTrack(randPick(trackLeadFutureTemplates)));
+      else scriptLines.push(randPick(trackLeadCurrentTemplates));
+    } else if (format === 'news-block') {
       lastNewsBlockAtRef.current = Date.now();
       lastFormatRef.current = 'news-block';
       scriptLines.push(randPick([
@@ -985,6 +1052,52 @@ export default function RadioHost() {
     hostLinePool
   ]);
 
+  const processNextHostEvent = useCallback(async () => {
+    if (hostEventBusyRef.current) return;
+    if (!isRadioMode || !playing || !playbackSlotKey) return;
+    const queueItems = Array.isArray(hostEventQueueRef.current) ? hostEventQueueRef.current : [];
+    if (!queueItems.length) return;
+    hostEventBusyRef.current = true;
+    try {
+      queueItems.sort((a, b) => {
+        const pa = Number(a?.priority) || 0;
+        const pb = Number(b?.priority) || 0;
+        if (pa !== pb) return pb - pa;
+        return (Number(a?.createdAt) || 0) - (Number(b?.createdAt) || 0);
+      });
+      const next = queueItems.shift();
+      hostEventQueueRef.current = queueItems;
+      if (!next) return;
+      if (String(next.slotKey || '') !== playbackSlotKey && next.type !== 'hour-news') return;
+      await speakHostForTrack(next.payload || {});
+    } finally {
+      hostEventBusyRef.current = false;
+    }
+  }, [isRadioMode, playbackSlotKey, playing, speakHostForTrack]);
+
+  const enqueueHostEvent = useCallback((event) => {
+    const item = event && typeof event === 'object' ? event : null;
+    if (!item) return;
+    const slotKey = String(item.slotKey || playbackSlotKey || '');
+    const dedupeKey = String(item.dedupeKey || `${item.type || 'event'}:${slotKey}`);
+    const queueItems = Array.isArray(hostEventQueueRef.current) ? hostEventQueueRef.current : [];
+    if (queueItems.some((x) => String(x?.dedupeKey || '') === dedupeKey)) return;
+    queueItems.push({
+      type: String(item.type || 'generic'),
+      priority: Number.isFinite(Number(item.priority)) ? Number(item.priority) : 1,
+      createdAt: Date.now(),
+      slotKey,
+      dedupeKey,
+      payload: item.payload || {}
+    });
+    hostEventQueueRef.current = queueItems;
+    if (hostEventPumpTimerRef.current) return;
+    hostEventPumpTimerRef.current = window.setTimeout(() => {
+      hostEventPumpTimerRef.current = null;
+      void processNextHostEvent();
+    }, 0);
+  }, [playbackSlotKey, processNextHostEvent]);
+
   const scheduleSpeakForTrack = useCallback(() => {
     if (speakScheduleTimerRef.current) {
       window.clearTimeout(speakScheduleTimerRef.current);
@@ -1022,20 +1135,29 @@ export default function RadioHost() {
       announceMode = 'future';
     }
     if (!Number.isFinite(delayMs) || delayMs < 0) delayMs = 700;
+    const slotKeyAtSchedule = playbackSlotKey;
     speakScheduleTimerRef.current = window.setTimeout(() => {
       speakScheduleTimerRef.current = null;
-      void speakHostForTrack({
-        duckFactor,
-        announceMode,
-        pauseMusic,
-        advanceToNextAfterSpeak,
-        allowNewsJoke: pauseMusic && advanceToNextAfterSpeak
+      enqueueHostEvent({
+        type: 'inter-track',
+        priority: 10,
+        slotKey: slotKeyAtSchedule,
+        dedupeKey: `inter-track:${slotKeyAtSchedule}`,
+        payload: {
+          duckFactor,
+          announceMode,
+          pauseMusic,
+          advanceToNextAfterSpeak,
+          allowNewsJoke: pauseMusic && advanceToNextAfterSpeak
+        }
       });
     }, delayMs);
-  }, [DUCK_MUSIC_FACTOR, currentTrack?.duration, duration, progress, speakHostForTrack]);
+  }, [DUCK_MUSIC_FACTOR, currentTrack?.duration, duration, progress, playbackSlotKey, enqueueHostEvent]);
 
   useEffect(() => {
     if (!isRadioMode || !playing || !playbackSlotKey) return;
+    // На новом треке сбрасываем неисполненные старые события.
+    hostEventQueueRef.current = [];
     if (lastCountedSlotKeyRef.current === playbackSlotKey) return;
     lastCountedSlotKeyRef.current = playbackSlotKey;
     hostTrackCounterRef.current += 1;
@@ -1055,9 +1177,30 @@ export default function RadioHost() {
   useEffect(() => {
     const nextId = String(currentTimeBlock?.id || '');
     if (!nextId) return;
-    // Временный стоп block-switch, чтобы не было конкурирующих входов ведущего.
+    const prevId = String(lastAnnouncedBlockIdRef.current || '');
+    if (!prevId) {
+      lastAnnouncedBlockIdRef.current = nextId;
+      return;
+    }
+    if (prevId === nextId) return;
+    if (isRadioMode && playing && playbackSlotKey) {
+      enqueueHostEvent({
+        type: 'block-switch',
+        priority: 2,
+        slotKey: playbackSlotKey,
+        dedupeKey: `block-switch:${prevId}->${nextId}:${playbackSlotKey}`,
+        payload: {
+          forceFormat: 'block-switch',
+          announceMode: 'future',
+          duckFactor: 0.08,
+          pauseMusic: false,
+          prevBlockId: prevId,
+          nextBlockId: nextId
+        }
+      });
+    }
     lastAnnouncedBlockIdRef.current = nextId;
-  }, [currentTimeBlock]);
+  }, [currentTimeBlock, enqueueHostEvent, isRadioMode, playbackSlotKey, playing]);
 
   useEffect(() => {
     if (playing) return;
@@ -1065,17 +1208,18 @@ export default function RadioHost() {
       window.clearTimeout(speakScheduleTimerRef.current);
       speakScheduleTimerRef.current = null;
     }
+    hostEventQueueRef.current = [];
   }, [playing]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
       if (!isRadioMode || !playing) return;
       if (hostPlayingRef.current) return;
-      const now = new Date();
-      if (now.getMinutes() !== 0) return;
+      const now = getMskClockParts();
+      if (now.minute !== 0) return;
       // Стартуем в начале часа; расширяем окно, чтобы не пропускать блок при фоне вкладки.
-      if (now.getSeconds() > 45) return;
-      const hourKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}-${now.getHours()}`;
+      if (now.second > 45) return;
+      const hourKey = `${now.year}-${now.month}-${now.day}-${now.hour}`;
       if (lastHourlyNewsKeyRef.current === hourKey) return;
       lastHourlyNewsKeyRef.current = hourKey;
       lastNewsBlockAtRef.current = Date.now();
@@ -1083,10 +1227,24 @@ export default function RadioHost() {
         window.clearTimeout(speakScheduleTimerRef.current);
         speakScheduleTimerRef.current = null;
       }
-      void speakHostForTrack({ forceFormat: 'news-block', duckFactor: 0, pauseMusic: true });
+      enqueueHostEvent({
+        type: 'hour-news',
+        priority: 100,
+        slotKey: livePlaybackSlotKeyRef.current,
+        dedupeKey: `hour-news:${hourKey}`,
+        payload: { forceFormat: 'news-block', duckFactor: 0, pauseMusic: true }
+      });
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [isRadioMode, playing, speakHostForTrack]);
+  }, [isRadioMode, playing, enqueueHostEvent]);
+
+  useEffect(() => {
+    if (!isRadioMode || !playing) return;
+    if (hostPlayingRef.current) return;
+    if (hostEventBusyRef.current) return;
+    if (!hostEventQueueRef.current.length) return;
+    void processNextHostEvent();
+  }, [isRadioMode, playing, playbackSlotKey, processNextHostEvent]);
 
   useEffect(() => {
     if (playing) return;
@@ -1108,6 +1266,11 @@ export default function RadioHost() {
       window.clearTimeout(speakScheduleTimerRef.current);
       speakScheduleTimerRef.current = null;
     }
+    if (hostEventPumpTimerRef.current) {
+      window.clearTimeout(hostEventPumpTimerRef.current);
+      hostEventPumpTimerRef.current = null;
+    }
+    hostEventQueueRef.current = [];
     if (ttsAudioRef.current) {
       try { ttsAudioRef.current.pause(); } catch (_) {}
       ttsAudioRef.current = null;
