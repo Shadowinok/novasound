@@ -27,9 +27,12 @@ export default function Layout() {
 
   const mskTime = useMemo(() => {
     try {
-      return new Intl.DateTimeFormat('ru-RU', { timeZone: 'Europe/Moscow', hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date(now));
+      const dt = new Date(now);
+      const utcMs = dt.getTime() + dt.getTimezoneOffset() * 60000;
+      const msk = new Date(utcMs + 3 * 60 * 60000);
+      return new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(msk);
     } catch {
-      return new Date(now).toLocaleTimeString('ru-RU');
+      return '--:--:--';
     }
   }, [now]);
 
@@ -55,8 +58,8 @@ export default function Layout() {
               <h1 className="site-title">
                 <span className="neon-pink">Nova</span><span className="neon-cyan">Sound</span>
               </h1>
-              <span className="msk-clock">Местное время {localTime}</span>
-              <span className="msk-clock msk-clock--secondary">MSK эфир {mskTime}</span>
+              <span className="msk-clock">MSK эфир {mskTime}</span>
+              <span className="msk-clock msk-clock--secondary">Местное время {localTime}</span>
             </div>
           </div>
         </header>

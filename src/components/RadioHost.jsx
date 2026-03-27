@@ -343,7 +343,7 @@ export default function RadioHost() {
         const notes = [baseFreq, baseFreq * 1.25, baseFreq * 1.5];
         notes.forEach((f, idx) => {
           const osc = ctx.createOscillator();
-          osc.type = 'sine';
+          osc.type = 'triangle';
           osc.frequency.value = f;
           const g = ctx.createGain();
           g.gain.value = 0.0001;
@@ -351,7 +351,7 @@ export default function RadioHost() {
           g.connect(master);
           const startAt = t0 + (idx * 0.06);
           g.gain.setValueAtTime(0.0001, startAt);
-          g.gain.linearRampToValueAtTime(0.025, startAt + 0.05);
+          g.gain.linearRampToValueAtTime(0.038, startAt + 0.05);
           g.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.45);
           osc.start(startAt);
           osc.stop(startAt + 0.5);
@@ -363,7 +363,7 @@ export default function RadioHost() {
       newsBedMasterGainRef.current = master;
       const now = ctx.currentTime;
       master.gain.cancelScheduledValues(now);
-      master.gain.linearRampToValueAtTime(0.095, now + 0.6);
+      master.gain.linearRampToValueAtTime(0.14, now + 0.45);
       pulse(392);
       newsBedPulseTimerRef.current = window.setInterval(() => {
         pulse(Math.random() < 0.5 ? 392 : 440);
@@ -414,8 +414,7 @@ export default function RadioHost() {
     const announceMode = String(opts.announceMode || 'future');
     const pauseMusic = Boolean(opts.pauseMusic);
     const advanceToNextAfterSpeak = Boolean(opts.advanceToNextAfterSpeak);
-    const prevBlockId = String(opts.prevBlockId || '');
-    const nextBlockId = String(opts.nextBlockId || '');
+    const allowNewsJoke = Boolean(opts.allowNewsJoke);
     if (!isRadioMode) return;
     if (!playing) return;
     if (!activeNow) return;
@@ -603,13 +602,6 @@ export default function RadioHost() {
       .filter((x) => String(x?.title || '').trim())
       .slice(0, 5)
       .map((x) => String(x.title).slice(0, 140));
-    const blockLabel = (id) => {
-      if (id === 'morning') return 'утренний вайб';
-      if (id === 'day') return 'дневной эфир';
-      if (id === 'evening') return 'вечерний разгон';
-      if (id === 'night') return 'ночной релакс';
-      return 'обычный эфир';
-    };
     const shortIronicFacts = [
       'будильник всегда звонит на самом интересном месте сна.',
       'очередь в магазине обычно быстрее двигается в соседней кассе.',
@@ -778,9 +770,10 @@ export default function RadioHost() {
       if (roll < 0.45) variants.push('track-intro');
       else if (roll < 0.64) variants.push('light-talk');
       else if (roll < 0.79) variants.push('program-list');
-      else if (roll < 0.93) variants.push('news-joke');
+      else if (roll < 0.93 && allowNewsJoke) variants.push('news-joke');
       else variants.push('id-jingle');
-      variants.push('track-intro', 'light-talk', 'program-list', 'news-joke', 'id-jingle');
+      if (allowNewsJoke) variants.push('track-intro', 'light-talk', 'program-list', 'news-joke', 'id-jingle');
+      else variants.push('track-intro', 'light-talk', 'program-list', 'id-jingle');
       const prev = lastFormatRef.current;
       return variants.find((f) => f !== prev) || variants[0];
     };
@@ -800,24 +793,7 @@ export default function RadioHost() {
       return line.replace(trackTitleNorm, liveNextTitle);
     };
 
-    if (format === 'block-switch') {
-      lastFormatRef.current = 'block-switch';
-      if (prevBlockId && prevBlockId !== nextBlockId) {
-        scriptLines.push(randPick([
-          `Выходим из режима «${blockLabel(prevBlockId)}».`,
-          `Блок «${blockLabel(prevBlockId)}» завершаем.`,
-          `Сегмент «${blockLabel(prevBlockId)}» закрыт.`
-        ]));
-      }
-      if (nextBlockId) {
-        scriptLines.push(randPick([
-          `Переходим в блок «${blockLabel(nextBlockId)}».`,
-          `Сейчас включаем режим «${blockLabel(nextBlockId)}».`,
-          `На ближайшее время у нас «${blockLabel(nextBlockId)}».`
-        ]));
-      }
-      scriptLines.push(randPick(trackLeadCurrentTemplates));
-    } else if (format === 'news-block') {
+    if (format === 'news-block') {
       lastNewsBlockAtRef.current = Date.now();
       lastFormatRef.current = 'news-block';
       scriptLines.push(randPick([
@@ -920,15 +896,6 @@ export default function RadioHost() {
       if (chance(0.55)) scriptLines.push(randPick(trackPunTemplates));
     }
 
-    if (lastFormatRef.current !== 'news-block' && chance(0.08) && hostCandidates.length) {
-      scriptLines.push(`Кстати, в ленте мелькнул заголовок: “${newsTitle}”.`);
-      scriptLines.push(newsCommentaryBuild());
-      scriptLines.push(randPick([
-        'Дальше по музыкальному курсу.',
-        'Ладно, фиксируем и возвращаемся к трекам.',
-        'А теперь снова в звук — там стабильнее.'
-      ]));
-    }
     if (lastFormatRef.current !== 'news-block' && chance(0.12)) {
       {
         const entry = pickPoolEntry('fact', randPick(shortIronicFacts));
@@ -940,7 +907,6 @@ export default function RadioHost() {
       if (hostPlayingRef.current) return;
       hostPlayingRef.current = true;
       if (forceFormat === 'news-block') startNewsBed();
-      if (pauseMusic && isRadioMode) pauseForHost();
       // Один запрос вместо серии фраз: меньше сетевых пауз между репликами.
       const fullScript = scriptLines
         .map((line) => String(line || '').trim())
@@ -961,6 +927,7 @@ export default function RadioHost() {
         shouldAbortBeforePlay: isOutdatedSpeech,
         onPlaybackStart: () => {
           if (isOutdatedSpeech()) return;
+          if (pauseMusic && isRadioMode) pauseForHost();
           if (duckApplied) return;
           duckApplied = true;
           applyMusicDuck(duckFactor);
@@ -1057,7 +1024,13 @@ export default function RadioHost() {
     if (!Number.isFinite(delayMs) || delayMs < 0) delayMs = 700;
     speakScheduleTimerRef.current = window.setTimeout(() => {
       speakScheduleTimerRef.current = null;
-      void speakHostForTrack({ duckFactor, announceMode, pauseMusic, advanceToNextAfterSpeak });
+      void speakHostForTrack({
+        duckFactor,
+        announceMode,
+        pauseMusic,
+        advanceToNextAfterSpeak,
+        allowNewsJoke: pauseMusic && advanceToNextAfterSpeak
+      });
     }, delayMs);
   }, [DUCK_MUSIC_FACTOR, currentTrack?.duration, duration, progress, speakHostForTrack]);
 
@@ -1082,29 +1055,9 @@ export default function RadioHost() {
   useEffect(() => {
     const nextId = String(currentTimeBlock?.id || '');
     if (!nextId) return;
-    if (!isRadioMode || !playing) {
-      lastAnnouncedBlockIdRef.current = nextId;
-      return;
-    }
-    const prevId = String(lastAnnouncedBlockIdRef.current || '');
-    if (!prevId) {
-      lastAnnouncedBlockIdRef.current = nextId;
-      return;
-    }
-    if (prevId === nextId) return;
+    // Временный стоп block-switch, чтобы не было конкурирующих входов ведущего.
     lastAnnouncedBlockIdRef.current = nextId;
-    if (speakScheduleTimerRef.current) {
-      window.clearTimeout(speakScheduleTimerRef.current);
-      speakScheduleTimerRef.current = null;
-    }
-    void speakHostForTrack({
-      forceFormat: 'block-switch',
-      pauseMusic: true,
-      duckFactor: 0,
-      prevBlockId: prevId,
-      nextBlockId: nextId
-    });
-  }, [currentTimeBlock, isRadioMode, playing, speakHostForTrack]);
+  }, [currentTimeBlock]);
 
   useEffect(() => {
     if (playing) return;

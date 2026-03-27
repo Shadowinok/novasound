@@ -174,7 +174,6 @@ export function PlayerProvider({ children }) {
           .then(({ data }) => {
             const now = data?.now || null;
             const q = Array.isArray(data?.queue) ? data.queue : [];
-            const startAtSec = Number(data?.nowOffsetSec) || 0;
             if (now && q.length) {
               let idx = q.findIndex((t) => String(t?._id) === String(now?._id));
               if (idx < 0) idx = 0;
@@ -185,7 +184,8 @@ export function PlayerProvider({ children }) {
                 playQueueTrack(q[nextIdx], q, nextIdx, { startAtSec: 0, isRadioPublic });
                 return;
               }
-              playQueueTrack(q[idx] || now, q, idx, { startAtSec, isRadioPublic });
+              // В радио-переходах стартуем с начала трека, чтобы не было случайных оффсетов.
+              playQueueTrack(q[idx] || now, q, idx, { startAtSec: 0, isRadioPublic });
               return;
             }
             radioSwitchingAfterEndRef.current = false;
@@ -304,8 +304,7 @@ export function PlayerProvider({ children }) {
         }
       }
 
-      const startAtSec = nextIdx === serverIdx ? (Number(data?.nowOffsetSec) || 0) : 0;
-      playQueueTrack(q[nextIdx] || now || q[0], q, Math.max(0, nextIdx), { startAtSec, isRadioPublic });
+      playQueueTrack(q[nextIdx] || now || q[0], q, Math.max(0, nextIdx), { startAtSec: 0, isRadioPublic });
       return true;
     } catch (_) {
       return false;
@@ -449,10 +448,10 @@ export function PlayerProvider({ children }) {
           .then(({ data }) => {
             const now = data?.now || null;
             const q = Array.isArray(data?.queue) ? data.queue : [];
-            const startAtSec = Number(data?.nowOffsetSec) || 0;
             if (now && q.length) {
               const nowIdx = q.findIndex((t) => String(t?._id) === String(now?._id));
-              loadTrack(now, { queue: q, startIndex: nowIdx >= 0 ? nowIdx : 0, isRadio: true, isRadioPublic, startAtSec });
+              // При ручном возврате в радио не догоняем оффсет, чтобы не прыгать по середине трека.
+              loadTrack(now, { queue: q, startIndex: nowIdx >= 0 ? nowIdx : 0, isRadio: true, isRadioPublic, startAtSec: 0 });
               return;
             }
             desiredPlayingRef.current = true;
