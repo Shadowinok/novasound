@@ -42,6 +42,7 @@ export default function RadioHost() {
     randomMaxSongs: 5
   });
   const [djEpisode, setDjEpisode] = useState(null);
+  const [currentTimeBlock, setCurrentTimeBlock] = useState(null);
 
   const hostTimerRef = useRef(null);
   const lastSpokenKeyRef = useRef('');
@@ -68,6 +69,7 @@ export default function RadioHost() {
   const livePlaybackSlotKeyRef = useRef('');
   const liveIsRadioModeRef = useRef(false);
   const livePlayingRef = useRef(false);
+  const lastAnnouncedBlockIdRef = useRef('');
 
   const activeNow = isRadioMode && currentTrack ? currentTrack : null;
   const currentTrackId = currentTrack?._id ? String(currentTrack._id) : '';
@@ -133,6 +135,7 @@ export default function RadioHost() {
     try {
       const { data } = await tracksApi.radioNow({ limit: 30 });
       setDjEpisode(data?.djEpisode || null);
+      setCurrentTimeBlock(data?.timeBlock || null);
     } catch (_) {}
   }, [isRadioMode]);
 
@@ -411,6 +414,8 @@ export default function RadioHost() {
     const announceMode = String(opts.announceMode || 'future');
     const pauseMusic = Boolean(opts.pauseMusic);
     const advanceToNextAfterSpeak = Boolean(opts.advanceToNextAfterSpeak);
+    const prevBlockId = String(opts.prevBlockId || '');
+    const nextBlockId = String(opts.nextBlockId || '');
     if (!isRadioMode) return;
     if (!playing) return;
     if (!activeNow) return;
@@ -436,6 +441,9 @@ export default function RadioHost() {
         if (data && Object.prototype.hasOwnProperty.call(data, 'djEpisode')) {
           episodeForSpeak = data.djEpisode || null;
           setDjEpisode(data.djEpisode || null);
+        }
+        if (data && Object.prototype.hasOwnProperty.call(data, 'timeBlock')) {
+          setCurrentTimeBlock(data.timeBlock || null);
         }
         const q = Array.isArray(data?.queue) ? data.queue : [];
         const idx = q.findIndex((t) => String(t?._id) === currentTrackId);
@@ -595,15 +603,31 @@ export default function RadioHost() {
       .filter((x) => String(x?.title || '').trim())
       .slice(0, 5)
       .map((x) => String(x.title).slice(0, 140));
+    const blockLabel = (id) => {
+      if (id === 'morning') return 'утренний вайб';
+      if (id === 'day') return 'дневной эфир';
+      if (id === 'evening') return 'вечерний разгон';
+      if (id === 'night') return 'ночной релакс';
+      return 'обычный эфир';
+    };
     const shortIronicFacts = [
-      'Интересный факт: будильник всегда звонит на самом интересном месте сна.',
-      'Маленькое наблюдение: очередь в магазине двигается быстрее в соседней кассе.',
-      'Факт дня: если танцевать дома, это уже кардио, а значит почти спорт.',
-      'Короткий факт: чай остывает ровно до того момента, когда ты решил его выпить.',
-      'Наблюдение: самые важные мысли приходят, когда телефон остался в другой комнате.',
-      'Ироничный факт: плейлист на час обычно слушается три часа.',
-      'Любопытно: кнопка «один трек и спать» официально не работает.'
+      'будильник всегда звонит на самом интересном месте сна.',
+      'очередь в магазине обычно быстрее двигается в соседней кассе.',
+      'если танцевать дома, это уже кардио и почти спорт.',
+      'чай остывает ровно к моменту, когда ты решил его выпить.',
+      'самые важные мысли приходят, когда телефон в другой комнате.',
+      'плейлист на час обычно слушается три часа.',
+      'кнопка «один трек и спать» официально не работает.'
     ];
+    const buildFactLine = (factBody, ctx = 'neutral') => {
+      const body = String(factBody || '').trim();
+      if (!body) return '';
+      const introsNeutral = ['Кстати,', 'Между прочим,', 'Оказывается,', 'Забавно, но', 'Небольшое наблюдение:'];
+      const introsPlayful = ['Кстати,', 'А ведь правда,', 'Вот что любопытно:', 'Между делом,', 'Смешной момент:'];
+      const introsSerious = ['Если по делу,', 'Если серьёзно,', 'Без лишнего пафоса,', 'По наблюдениям,', 'По факту,'];
+      const pick = ctx === 'playful' ? introsPlayful : (ctx === 'serious' ? introsSerious : introsNeutral);
+      return `${randPick(pick)} ${body}`;
+    };
 
     const newsCommentaryBuild = () => {
       const t = String(newsTitle || '').toLowerCase();
@@ -776,7 +800,24 @@ export default function RadioHost() {
       return line.replace(trackTitleNorm, liveNextTitle);
     };
 
-    if (format === 'news-block') {
+    if (format === 'block-switch') {
+      lastFormatRef.current = 'block-switch';
+      if (prevBlockId && prevBlockId !== nextBlockId) {
+        scriptLines.push(randPick([
+          `Выходим из режима «${blockLabel(prevBlockId)}».`,
+          `Блок «${blockLabel(prevBlockId)}» завершаем.`,
+          `Сегмент «${blockLabel(prevBlockId)}» закрыт.`
+        ]));
+      }
+      if (nextBlockId) {
+        scriptLines.push(randPick([
+          `Переходим в блок «${blockLabel(nextBlockId)}».`,
+          `Сейчас включаем режим «${blockLabel(nextBlockId)}».`,
+          `На ближайшее время у нас «${blockLabel(nextBlockId)}».`
+        ]));
+      }
+      scriptLines.push(randPick(trackLeadCurrentTemplates));
+    } else if (format === 'news-block') {
       lastNewsBlockAtRef.current = Date.now();
       lastFormatRef.current = 'news-block';
       scriptLines.push(randPick([
@@ -833,7 +874,7 @@ export default function RadioHost() {
       }
       if (chance(0.45)) {
         const entry = pickPoolEntry('fact', randPick(shortIronicFacts));
-        scriptLines.push(fillVars(entry.text, {}, entry.cue));
+        scriptLines.push(buildFactLine(fillVars(entry.text, {}, entry.cue), 'neutral'));
       }
       if (announceWithDjLead) scriptLines.push(randPick(djSelfTemplates));
       scriptLines.push(wrapWithFreshTrack(randPick(trackLeadFutureTemplates)));
@@ -891,7 +932,7 @@ export default function RadioHost() {
     if (lastFormatRef.current !== 'news-block' && chance(0.12)) {
       {
         const entry = pickPoolEntry('fact', randPick(shortIronicFacts));
-        scriptLines.push(fillVars(entry.text, {}, entry.cue));
+        scriptLines.push(buildFactLine(fillVars(entry.text, {}, entry.cue), lastFormatRef.current === 'light-talk' ? 'playful' : 'neutral'));
       }
     }
 
@@ -1037,6 +1078,33 @@ export default function RadioHost() {
     }
     scheduleSpeakForTrack();
   }, [isRadioMode, playing, playbackSlotKey, scheduleSpeakForTrack, hostSchedule]);
+
+  useEffect(() => {
+    const nextId = String(currentTimeBlock?.id || '');
+    if (!nextId) return;
+    if (!isRadioMode || !playing) {
+      lastAnnouncedBlockIdRef.current = nextId;
+      return;
+    }
+    const prevId = String(lastAnnouncedBlockIdRef.current || '');
+    if (!prevId) {
+      lastAnnouncedBlockIdRef.current = nextId;
+      return;
+    }
+    if (prevId === nextId) return;
+    lastAnnouncedBlockIdRef.current = nextId;
+    if (speakScheduleTimerRef.current) {
+      window.clearTimeout(speakScheduleTimerRef.current);
+      speakScheduleTimerRef.current = null;
+    }
+    void speakHostForTrack({
+      forceFormat: 'block-switch',
+      pauseMusic: true,
+      duckFactor: 0,
+      prevBlockId: prevId,
+      nextBlockId: nextId
+    });
+  }, [currentTimeBlock, isRadioMode, playing, speakHostForTrack]);
 
   useEffect(() => {
     if (playing) return;

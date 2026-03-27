@@ -55,7 +55,7 @@ export default function Layout() {
               <h1 className="site-title">
                 <span className="neon-pink">Nova</span><span className="neon-cyan">Sound</span>
               </h1>
-              <span className="msk-clock">LOCAL {localTime}</span>
+              <span className="msk-clock">Местное время {localTime}</span>
               <span className="msk-clock msk-clock--secondary">MSK эфир {mskTime}</span>
             </div>
           </div>

@@ -50,6 +50,26 @@ export default function Admin() {
   const [hostCfgPlaylistMode, setHostCfgPlaylistMode] = useState('random');
   const [hostCfgDjTheme, setHostCfgDjTheme] = useState('auto');
   const [hostCfgSaving, setHostCfgSaving] = useState(false);
+  const [campaignsList, setCampaignsList] = useState([]);
+  const [campaignsLoading, setCampaignsLoading] = useState(false);
+  const [campaignsSaving, setCampaignsSaving] = useState(false);
+  const [campaignMessage, setCampaignMessage] = useState('');
+  const [campaignEditingId, setCampaignEditingId] = useState(null);
+  const [campaignTitle, setCampaignTitle] = useState('');
+  const [campaignSlug, setCampaignSlug] = useState('');
+  const [campaignType, setCampaignType] = useState('track_week');
+  const [campaignStatus, setCampaignStatus] = useState('draft');
+  const [campaignStartsAt, setCampaignStartsAt] = useState('');
+  const [campaignEndsAt, setCampaignEndsAt] = useState('');
+  const [campaignRulesText, setCampaignRulesText] = useState('');
+  const [campaignHostIntroText, setCampaignHostIntroText] = useState('');
+  const [campaignHostOutroText, setCampaignHostOutroText] = useState('');
+  const [campaignAllowExistingTracks, setCampaignAllowExistingTracks] = useState(true);
+  const [campaignAllowUploadOptIn, setCampaignAllowUploadOptIn] = useState(true);
+  const [campaignSelectedId, setCampaignSelectedId] = useState('');
+  const [campaignSubmissions, setCampaignSubmissions] = useState([]);
+  const [campaignSubmissionsLoading, setCampaignSubmissionsLoading] = useState(false);
+  const [campaignSubmissionNotes, setCampaignSubmissionNotes] = useState({});
 
   const fetchPending = () => {
     adminApi.pendingTracks().then((r) => setPending(r.data || [])).catch(() => setPending([]));
@@ -65,6 +85,46 @@ export default function Admin() {
     adminApi.trackReports('open')
       .then((r) => setTrackReports(r.data || []))
       .catch(() => setTrackReports([]));
+  };
+
+  const resetCampaignForm = () => {
+    setCampaignEditingId(null);
+    setCampaignTitle('');
+    setCampaignSlug('');
+    setCampaignType('track_week');
+    setCampaignStatus('draft');
+    setCampaignStartsAt('');
+    setCampaignEndsAt('');
+    setCampaignRulesText('');
+    setCampaignHostIntroText('');
+    setCampaignHostOutroText('');
+    setCampaignAllowExistingTracks(true);
+    setCampaignAllowUploadOptIn(true);
+  };
+
+  const fetchCampaigns = () => {
+    setCampaignsLoading(true);
+    adminApi.campaigns.list()
+      .then((r) => {
+        const list = r?.data || [];
+        setCampaignsList(list);
+        if (!campaignSelectedId && list[0]?._id) setCampaignSelectedId(String(list[0]._id));
+      })
+      .catch(() => setCampaignsList([]))
+      .finally(() => setCampaignsLoading(false));
+  };
+
+  const fetchCampaignSubmissions = (id) => {
+    const campaignId = String(id || '');
+    if (!campaignId) {
+      setCampaignSubmissions([]);
+      return;
+    }
+    setCampaignSubmissionsLoading(true);
+    adminApi.campaigns.submissions(campaignId)
+      .then((r) => setCampaignSubmissions(r?.data || []))
+      .catch(() => setCampaignSubmissions([]))
+      .finally(() => setCampaignSubmissionsLoading(false));
   };
 
   useEffect(() => {
@@ -105,6 +165,9 @@ export default function Admin() {
         })
         .catch(() => {})
         .finally(() => setLoading(false));
+    } else if (tab === 'campaigns') {
+      setLoading(false);
+      fetchCampaigns();
     } else {
       adminApi.users().then((r) => setUsers(r.data || [])).catch(() => setUsers([])).finally(() => setLoading(false));
     }
@@ -412,6 +475,11 @@ export default function Admin() {
     return playlists;
   }, [playlists, plHomeFilter]);
 
+  useEffect(() => {
+    if (tab !== 'campaigns') return;
+    fetchCampaignSubmissions(campaignSelectedId);
+  }, [tab, campaignSelectedId]);
+
   const saveHostSettings = (e) => {
     e.preventDefault();
     const fixedEverySongs = Math.max(1, Math.min(20, Number(hostCfgFixedEverySongs) || 2));
@@ -437,6 +505,90 @@ export default function Admin() {
       .finally(() => setHostCfgSaving(false));
   };
 
+  const startEditCampaign = (c) => {
+    setCampaignEditingId(c?._id || null);
+    setCampaignTitle(c?.title || '');
+    setCampaignSlug(c?.slug || '');
+    setCampaignType(c?.type || 'track_week');
+    setCampaignStatus(c?.status || 'draft');
+    setCampaignStartsAt(c?.startsAt ? new Date(c.startsAt).toISOString().slice(0, 16) : '');
+    setCampaignEndsAt(c?.endsAt ? new Date(c.endsAt).toISOString().slice(0, 16) : '');
+    setCampaignRulesText(c?.rulesText || '');
+    setCampaignHostIntroText(c?.hostIntroText || '');
+    setCampaignHostOutroText(c?.hostOutroText || '');
+    setCampaignAllowExistingTracks(c?.allowExistingTracks !== false);
+    setCampaignAllowUploadOptIn(c?.allowUploadOptIn !== false);
+    setCampaignMessage('');
+  };
+
+  const saveCampaign = (e) => {
+    e.preventDefault();
+    const title = campaignTitle.trim();
+    if (title.length < 3) {
+      setCampaignMessage('Название кампании должно быть не короче 3 символов');
+      return;
+    }
+    const payload = {
+      title,
+      slug: campaignSlug.trim() || undefined,
+      type: campaignType,
+      status: campaignStatus,
+      startsAt: campaignStartsAt || null,
+      endsAt: campaignEndsAt || null,
+      rulesText: campaignRulesText,
+      hostIntroText: campaignHostIntroText,
+      hostOutroText: campaignHostOutroText,
+      allowExistingTracks: campaignAllowExistingTracks,
+      allowUploadOptIn: campaignAllowUploadOptIn
+    };
+    setCampaignsSaving(true);
+    setCampaignMessage('');
+    const req = campaignEditingId
+      ? adminApi.campaigns.update(campaignEditingId, payload)
+      : adminApi.campaigns.create(payload);
+    req
+      .then((r) => {
+        const id = String(r?.data?._id || campaignEditingId || '');
+        setCampaignMessage(campaignEditingId ? 'Кампания обновлена' : 'Кампания создана');
+        resetCampaignForm();
+        fetchCampaigns();
+        if (id) setCampaignSelectedId(id);
+      })
+      .catch((err) => setCampaignMessage(err.response?.data?.message || 'Ошибка сохранения кампании'))
+      .finally(() => setCampaignsSaving(false));
+  };
+
+  const removeCampaign = (id) => {
+    if (!id) return;
+    if (!window.confirm('Удалить кампанию и её заявки?')) return;
+    setCampaignsSaving(true);
+    setCampaignMessage('');
+    adminApi.campaigns.remove(id)
+      .then(() => {
+        setCampaignMessage('Кампания удалена');
+        if (campaignSelectedId === id) setCampaignSelectedId('');
+        fetchCampaigns();
+        setCampaignSubmissions([]);
+      })
+      .catch((err) => setCampaignMessage(err.response?.data?.message || 'Не удалось удалить кампанию'))
+      .finally(() => setCampaignsSaving(false));
+  };
+
+  const updateSubmissionStatus = (submissionId, status) => {
+    const campaignId = String(campaignSelectedId || '');
+    if (!campaignId || !submissionId) return;
+    const note = campaignSubmissionNotes[submissionId] || '';
+    setCampaignsSaving(true);
+    setCampaignMessage('');
+    adminApi.campaigns.updateSubmissionStatus(campaignId, submissionId, status, note)
+      .then(() => {
+        setCampaignMessage('Статус заявки обновлён');
+        fetchCampaignSubmissions(campaignId);
+      })
+      .catch((err) => setCampaignMessage(err.response?.data?.message || 'Не удалось обновить заявку'))
+      .finally(() => setCampaignsSaving(false));
+  };
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="page admin-page">
       <h2 className="page-title">Админ-панель</h2>
@@ -448,6 +600,7 @@ export default function Admin() {
         <button type="button" className={tab === 'reports' ? 'active' : ''} onClick={() => setTab('reports')}>Жалобы на треки</button>
         <button type="button" className={tab === 'announcements' ? 'active' : ''} onClick={() => setTab('announcements')}>Анонсы</button>
         <button type="button" className={tab === 'radio-host' ? 'active' : ''} onClick={() => setTab('radio-host')}>Радио ведущий</button>
+        <button type="button" className={tab === 'campaigns' ? 'active' : ''} onClick={() => setTab('campaigns')}>Кампании</button>
       </div>
       {tab === 'covers' && (
         <>
@@ -1089,6 +1242,184 @@ export default function Admin() {
                 </button>
               </div>
             </form>
+          )}
+        </div>
+      )}
+      {tab === 'campaigns' && (
+        <div className="admin-announcements">
+          <p className="admin-hint">
+            Универсальные кампании: конкурсные активности, ручной отбор заявок и тексты подводок ведущего.
+          </p>
+          {campaignMessage && <div className="admin-message">{campaignMessage}</div>}
+          <form className="admin-playlist-form admin-ann-form" onSubmit={saveCampaign}>
+            <h3 className="admin-playlist-form-title">{campaignEditingId ? 'Редактировать кампанию' : 'Новая кампания'}</h3>
+            <label className="admin-pl-label">
+              Название *
+              <input
+                type="text"
+                className="admin-comment-input admin-pl-field"
+                value={campaignTitle}
+                onChange={(e) => setCampaignTitle(e.target.value)}
+                placeholder="Например: Трек недели"
+                maxLength={140}
+                required
+              />
+            </label>
+            <label className="admin-pl-label">
+              Slug (опционально)
+              <input
+                type="text"
+                className="admin-comment-input admin-pl-field"
+                value={campaignSlug}
+                onChange={(e) => setCampaignSlug(e.target.value)}
+                placeholder="track-week"
+              />
+            </label>
+            <div className="admin-pl-form-actions">
+              <label className="admin-pl-label" style={{ minWidth: 180 }}>
+                Тип
+                <select className="admin-comment-input admin-pl-field" value={campaignType} onChange={(e) => setCampaignType(e.target.value)}>
+                  <option value="track_week">Трек недели</option>
+                  <option value="challenge">Челлендж</option>
+                  <option value="special">Спецкампания</option>
+                </select>
+              </label>
+              <label className="admin-pl-label" style={{ minWidth: 180 }}>
+                Статус
+                <select className="admin-comment-input admin-pl-field" value={campaignStatus} onChange={(e) => setCampaignStatus(e.target.value)}>
+                  <option value="draft">Черновик</option>
+                  <option value="active">Активна</option>
+                  <option value="closed">Закрыта</option>
+                  <option value="archived">Архив</option>
+                </select>
+              </label>
+            </div>
+            <div className="admin-pl-form-actions">
+              <label className="admin-pl-label" style={{ minWidth: 220 }}>
+                Старт
+                <input
+                  type="datetime-local"
+                  className="admin-comment-input admin-pl-field"
+                  value={campaignStartsAt}
+                  onChange={(e) => setCampaignStartsAt(e.target.value)}
+                />
+              </label>
+              <label className="admin-pl-label" style={{ minWidth: 220 }}>
+                Финиш
+                <input
+                  type="datetime-local"
+                  className="admin-comment-input admin-pl-field"
+                  value={campaignEndsAt}
+                  onChange={(e) => setCampaignEndsAt(e.target.value)}
+                />
+              </label>
+            </div>
+            <label className="admin-pl-checkbox">
+              <input type="checkbox" checked={campaignAllowUploadOptIn} onChange={(e) => setCampaignAllowUploadOptIn(e.target.checked)} />
+              Показывать галочку конкурса в форме загрузки
+            </label>
+            <label className="admin-pl-checkbox">
+              <input type="checkbox" checked={campaignAllowExistingTracks} onChange={(e) => setCampaignAllowExistingTracks(e.target.checked)} />
+              Разрешать отправку уже опубликованных треков
+            </label>
+            <label className="admin-pl-label">
+              Правила кампании
+              <textarea className="admin-comment-input admin-pl-textarea" rows={3} value={campaignRulesText} onChange={(e) => setCampaignRulesText(e.target.value)} />
+            </label>
+            <label className="admin-pl-label">
+              Подводка ведущего на вход (опционально)
+              <textarea className="admin-comment-input admin-pl-textarea" rows={2} value={campaignHostIntroText} onChange={(e) => setCampaignHostIntroText(e.target.value)} />
+            </label>
+            <label className="admin-pl-label">
+              Подводка ведущего на выход (опционально)
+              <textarea className="admin-comment-input admin-pl-textarea" rows={2} value={campaignHostOutroText} onChange={(e) => setCampaignHostOutroText(e.target.value)} />
+            </label>
+            <div className="admin-pl-form-actions">
+              <button type="submit" className="admin-btn admin-pl-submit" disabled={campaignsSaving}>
+                {campaignsSaving ? 'Сохраняем...' : campaignEditingId ? 'Сохранить кампанию' : 'Создать кампанию'}
+              </button>
+              {campaignEditingId && (
+                <button type="button" className="admin-btn admin-pl-cancel" onClick={resetCampaignForm}>Отмена</button>
+              )}
+            </div>
+          </form>
+
+          {campaignsLoading ? (
+            <div className="loading">Загрузка кампаний...</div>
+          ) : campaignsList.length === 0 ? (
+            <div className="empty">Кампаний пока нет</div>
+          ) : (
+            <div className="admin-ann-grid">
+              {campaignsList.map((c) => (
+                <div key={c._id} className="admin-ann-card">
+                  <div className="admin-ann-card-top">
+                    <div className="admin-ann-card-title">{c.title}</div>
+                    <div className="admin-ann-meta">
+                      <span className="admin-ann-badge">{c.type}</span>
+                      <span className="admin-ann-badge">{c.status}</span>
+                    </div>
+                  </div>
+                  <div className="admin-ann-actions">
+                    <button type="button" className="admin-btn admin-pl-edit" onClick={() => startEditCampaign(c)}>Редактировать</button>
+                    <button type="button" className="admin-btn admin-pl-feature" onClick={() => setCampaignSelectedId(c._id)}>Заявки</button>
+                    <button type="button" className="admin-btn reject" onClick={() => removeCampaign(c._id)} disabled={campaignsSaving}>Удалить</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {campaignSelectedId && (
+            <div className="admin-playlist-form" style={{ maxWidth: '100%', marginTop: 18 }}>
+              <h3 className="admin-playlist-form-title">Заявки кампании</h3>
+              {campaignSubmissionsLoading ? (
+                <div className="loading">Загрузка заявок...</div>
+              ) : campaignSubmissions.length === 0 ? (
+                <div className="empty">Пока нет заявок</div>
+              ) : (
+                <div className="reports-table-wrap">
+                  <table className="reports-table">
+                    <thead>
+                      <tr>
+                        <th>Трек</th>
+                        <th>Автор</th>
+                        <th>Источник</th>
+                        <th>Статус</th>
+                        <th>Заметка</th>
+                        <th>Действие</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {campaignSubmissions.map((s) => (
+                        <tr key={s._id}>
+                          <td>{s.trackId?.title || '-'}</td>
+                          <td>{s.authorId?.username || s.trackId?.author?.username || '-'}</td>
+                          <td>{s.source || '-'}</td>
+                          <td>{s.status}</td>
+                          <td>
+                            <textarea
+                              className="rep-admin-comment"
+                              rows={2}
+                              value={campaignSubmissionNotes[s._id] ?? (s.adminNote || '')}
+                              onChange={(e) => setCampaignSubmissionNotes((prev) => ({ ...prev, [s._id]: e.target.value }))}
+                            />
+                          </td>
+                          <td>
+                            <div className="rep-actions">
+                              {['pending', 'shortlisted', 'winner', 'editor_pick', 'rejected'].map((st) => (
+                                <button key={st} type="button" className="admin-btn approve" onClick={() => updateSubmissionStatus(s._id, st)}>
+                                  {st}
+                                </button>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           )}
         </div>
       )}

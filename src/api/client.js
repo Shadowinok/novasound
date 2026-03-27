@@ -273,6 +273,15 @@ export const admin = {
     update: (id, data) => client.put(`/admin/announcements/${id}`, data),
     delete: (id) => client.delete(`/admin/announcements/${id}`)
   },
+  campaigns: {
+    list: () => client.get('/admin/campaigns'),
+    create: (data) => client.post('/admin/campaigns', data),
+    update: (id, data) => client.put(`/admin/campaigns/${id}`, data),
+    remove: (id) => client.delete(`/admin/campaigns/${id}`),
+    submissions: (id, status) => client.get(`/admin/campaigns/${id}/submissions`, { params: status ? { status } : undefined }),
+    updateSubmissionStatus: (id, submissionId, status, adminNote = '') =>
+      client.put(`/admin/campaigns/${id}/submissions/${submissionId}/status`, { status, adminNote })
+  },
   deleteUser: (id, reason) => client.delete(`/admin/users/${id}`, { data: { reason } }),
   pendingTracks: () => client.get('/admin/tracks/pending'),
   coverPending: () => client.get('/admin/tracks/cover-pending'),
@@ -282,6 +291,12 @@ export const admin = {
   rejectTrack: (id, comment) => client.put(`/admin/tracks/${id}/reject`, { comment }),
   trackReports: (status) => client.get('/admin/track-reports', { params: { status: status || 'open' } }),
   resolveTrackReport: (reportId, action, adminComment) => client.put(`/admin/track-reports/${reportId}/resolve`, { action, adminComment })
+};
+
+export const campaigns = {
+  active: () => client.get('/campaigns/active'),
+  submitTrack: (campaignId, trackId, source = 'manual-send') =>
+    client.post(`/campaigns/${campaignId}/submit-track`, { trackId, source })
 };
 
 /** URL стрима; для HTML5 <audio> JWT передаётся в query (?token=), заголовок туда не попадает */
