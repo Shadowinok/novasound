@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import client from '../api/client';
-import { admin as adminApi, playlists as playlistsApi } from '../api/client';
+import { admin as adminApi, playlists as playlistsApi, chat as chatApi } from '../api/client';
 import TrackCard from '../components/TrackCard';
 import { coverImageBackgroundStyle } from '../utils/coverImage';
 
@@ -50,6 +50,16 @@ export default function Admin() {
   const [hostCfgPlaylistMode, setHostCfgPlaylistMode] = useState('random');
   const [hostCfgDjTheme, setHostCfgDjTheme] = useState('auto');
   const [hostCfgSaving, setHostCfgSaving] = useState(false);
+  const [hostCfgRequestDesk, setHostCfgRequestDesk] = useState(false);
+  const [hostCfgDeskEverySongs, setHostCfgDeskEverySongs] = useState(6);
+  const [hostCfgDeskMinInterval, setHostCfgDeskMinInterval] = useState(4);
+  const [hostCfgDeskBanterChance, setHostCfgDeskBanterChance] = useState(0.22);
+  const [hostCfgDeskIntro, setHostCfgDeskIntro] = useState('');
+  const [hostCfgDeskBody, setHostCfgDeskBody] = useState('Пишет {user}: {text}.');
+  const [hostCfgDeskOutro, setHostCfgDeskOutro] = useState('');
+  const [hostCfgDeskBanterTpl, setHostCfgDeskBanterTpl] = useState('');
+  const [chatMessageReports, setChatMessageReports] = useState([]);
+  const [roleUpdatingId, setRoleUpdatingId] = useState('');
   const [campaignsList, setCampaignsList] = useState([]);
   const [campaignsLoading, setCampaignsLoading] = useState(false);
   const [campaignsSaving, setCampaignsSaving] = useState(false);
@@ -143,6 +153,12 @@ export default function Admin() {
         .then((r) => setTrackReports(r.data || []))
         .catch(() => setTrackReports([]))
         .finally(() => setLoading(false));
+    } else if (tab === 'chat-reports') {
+      chatApi
+        .reports('open')
+        .then((r) => setChatMessageReports(Array.isArray(r.data) ? r.data : []))
+        .catch(() => setChatMessageReports([]))
+        .finally(() => setLoading(false));
     } else if (tab === 'announcements') {
       adminApi.announcements
         .list()
@@ -162,6 +178,15 @@ export default function Admin() {
           setHostCfgRandomMaxSongs(Math.max(min, maxRaw));
           setHostCfgPlaylistMode(data.radioPlaylistMode === 'dj' ? 'dj' : 'random');
           setHostCfgDjTheme(String(data.djTheme || 'auto'));
+          setHostCfgRequestDesk(!!data.requestDeskEnabled);
+          setHostCfgDeskEverySongs(Math.max(1, Math.min(40, Number(data.requestDeskEverySongs) || 6)));
+          setHostCfgDeskMinInterval(Math.max(1, Math.min(120, Number(data.requestDeskMinIntervalMinutes) || 4)));
+          const bc = Number(data.requestDeskBanterChance);
+          setHostCfgDeskBanterChance(Number.isFinite(bc) ? Math.min(1, Math.max(0, bc)) : 0.22);
+          setHostCfgDeskIntro(String(data.deskIntroTemplate || ''));
+          setHostCfgDeskBody(String(data.deskBodyTemplate || 'Пишет {user}: {text}.'));
+          setHostCfgDeskOutro(String(data.deskOutroTemplate || ''));
+          setHostCfgDeskBanterTpl(String(data.deskBanterTemplate || ''));
         })
         .catch(() => {})
         .finally(() => setLoading(false));
@@ -201,6 +226,40 @@ export default function Admin() {
       adminApi.coverPending().then((r) => setPendingCovers(r.data || [])).catch(() => {});
     }).catch((e) => setAdminMessage(e.response?.data?.message || 'Ошибка'));
   };
+  const handleUserRoleChange = (u, newRole) => {
+    if (!u?._id) return;
+    const adminCount = users.filter((x) => x.role === 'admin').length;
+    if (u.role === 'admin' && newRole !== 'admin' && adminCount <= 1) {
+      setAdminMessage('Нельзя снять последнего администратора');
+      return;
+    }
+    setRoleUpdatingId(String(u._id));
+    setAdminMessage('');
+    adminApi
+      .setUserRole(u._id, newRole)
+      .then((r) => {
+        const row = r?.data;
+        if (row?._id) {
+          setUsers((prev) => prev.map((x) => (String(x._id) === String(row._id) ? { ...x, ...row } : x)));
+        }
+        setAdminMessage('Роль обновлена');
+      })
+      .catch((e) => setAdminMessage(e.response?.data?.message || 'Не удалось сменить роль'))
+      .finally(() => setRoleUpdatingId(''));
+  };
+
+  const resolveChatMessageReport = (reportId) => {
+    if (!reportId) return;
+    setAdminMessage('');
+    chatApi
+      .updateReport(reportId, { status: 'resolved' })
+      .then(() => {
+        setChatMessageReports((prev) => prev.filter((x) => String(x._id) !== String(reportId)));
+        setAdminMessage('Жалоба на сообщение закрыта');
+      })
+      .catch((e) => setAdminMessage(e.response?.data?.message || 'Ошибка'));
+  };
+
   const handleDeleteUser = (id) => {
     if (!id) return;
     // eslint-disable-next-line no-alert
@@ -498,7 +557,15 @@ export default function Admin() {
         randomMinSongs,
         randomMaxSongs,
         radioPlaylistMode: hostCfgPlaylistMode === 'dj' ? 'dj' : 'random',
-        djTheme: hostCfgDjTheme
+        djTheme: hostCfgDjTheme,
+        requestDeskEnabled: hostCfgRequestDesk,
+        requestDeskEverySongs: Math.max(1, Math.min(40, Number(hostCfgDeskEverySongs) || 6)),
+        requestDeskMinIntervalMinutes: Math.max(1, Math.min(120, Number(hostCfgDeskMinInterval) || 4)),
+        requestDeskBanterChance: Math.min(1, Math.max(0, Number(hostCfgDeskBanterChance) || 0)),
+        deskIntroTemplate: hostCfgDeskIntro,
+        deskBodyTemplate: hostCfgDeskBody,
+        deskOutroTemplate: hostCfgDeskOutro,
+        deskBanterTemplate: hostCfgDeskBanterTpl
       })
       .then(() => setAdminMessage('Настройки ведущего сохранены'))
       .catch((err) => setAdminMessage(err.response?.data?.message || 'Не удалось сохранить настройки ведущего'))
@@ -598,6 +665,9 @@ export default function Admin() {
         <button type="button" className={tab === 'playlists' ? 'active' : ''} onClick={() => setTab('playlists')}>Плейлисты</button>
         <button type="button" className={tab === 'users' ? 'active' : ''} onClick={() => setTab('users')}>Пользователи</button>
         <button type="button" className={tab === 'reports' ? 'active' : ''} onClick={() => setTab('reports')}>Жалобы на треки</button>
+        <button type="button" className={tab === 'chat-reports' ? 'active' : ''} onClick={() => setTab('chat-reports')}>
+          Жалобы в чат
+        </button>
         <button type="button" className={tab === 'announcements' ? 'active' : ''} onClick={() => setTab('announcements')}>Анонсы</button>
         <button type="button" className={tab === 'radio-host' ? 'active' : ''} onClick={() => setTab('radio-host')}>Радио ведущий</button>
         <button type="button" className={tab === 'campaigns' ? 'active' : ''} onClick={() => setTab('campaigns')}>Кампании</button>
@@ -874,7 +944,19 @@ export default function Admin() {
                     <tr key={u._id}>
                       <td>{u.username}</td>
                       <td>{u.email}</td>
-                      <td>{u.role}</td>
+                      <td>
+                        <select
+                          className="admin-comment-input admin-user-role-select"
+                          value={u.role || 'user'}
+                          disabled={roleUpdatingId === String(u._id)}
+                          onChange={(e) => handleUserRoleChange(u, e.target.value)}
+                          aria-label={`Роль ${u.username}`}
+                        >
+                          <option value="user">user</option>
+                          <option value="moderator">moderator</option>
+                          <option value="admin">admin</option>
+                        </select>
+                      </td>
                       <td>{u.isBlocked ? 'Заблокирован' : 'Активен'}</td>
                       <td>{u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '-'}</td>
                       <td>
@@ -968,6 +1050,50 @@ export default function Admin() {
                             </button>
                           )}
                         </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+      {tab === 'chat-reports' && (
+        <div className="admin-reports">
+          <p className="admin-hint">Жалобы на сообщения в чате. Модераторы видят список во вкладке «Жалобы» на странице чата.</p>
+          {adminMessage && <div className="admin-message">{adminMessage}</div>}
+          {loading ? (
+            <div className="loading">Загрузка...</div>
+          ) : chatMessageReports.length === 0 ? (
+            <div className="empty">Открытых жалоб на сообщения нет</div>
+          ) : (
+            <div className="reports-table-wrap">
+              <table className="reports-table">
+                <thead>
+                  <tr>
+                    <th>Дата</th>
+                    <th>Жалобщик</th>
+                    <th>Текст (снимок)</th>
+                    <th>Канал</th>
+                    <th>Действие</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {chatMessageReports.map((rep) => (
+                    <tr key={rep._id}>
+                      <td>{rep.createdAt ? new Date(rep.createdAt).toLocaleString('ru-RU') : '-'}</td>
+                      <td>{rep.reporter?.username || '-'}</td>
+                      <td className="rep-text">{rep.textSnapshot || '—'}</td>
+                      <td>
+                        {rep.channel?.type === 'general'
+                          ? 'Общий'
+                          : rep.channel?.title || rep.channel?.slug || String(rep.channel?._id || '')}
+                      </td>
+                      <td>
+                        <button type="button" className="admin-btn approve" onClick={() => resolveChatMessageReport(rep._id)}>
+                          Закрыть
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -1235,6 +1361,106 @@ export default function Admin() {
                   <option value="hiphop">Хип-хоп</option>
                   <option value="jazz">Джаз</option>
                 </select>
+              </label>
+              <h3 className="admin-playlist-form-title" style={{ marginTop: 8 }}>Стол заказов в эфире</h3>
+              <label className="admin-pl-checkbox">
+                <input
+                  type="checkbox"
+                  checked={hostCfgRequestDesk}
+                  onChange={(e) => setHostCfgRequestDesk(e.target.checked)}
+                />
+                Стол заказов в чате (вкладка «Окно заказа»)
+              </label>
+              <p className="admin-hint" style={{ marginTop: 6, marginBottom: 10 }}>
+                ЗЕРО забирает заявку в эфир по счётчику треков и минимальному интервалу между блоками (настраивается ниже).
+                В шаблонах:{' '}
+                <code>{'{user}'}</code>, <code>{'{text}'}</code> — для основного текста; в бантере — <code>{'{user}'}</code>.
+              </p>
+              <label className="admin-pl-label">
+                Блок стола каждые N треков (в эфире)
+                <input
+                  type="number"
+                  min="1"
+                  max="40"
+                  step="1"
+                  className="admin-comment-input admin-pl-field"
+                  value={hostCfgDeskEverySongs}
+                  onChange={(e) => setHostCfgDeskEverySongs(Number(e.target.value || 1))}
+                  disabled={!hostCfgRequestDesk}
+                />
+              </label>
+              <label className="admin-pl-label">
+                Мин. интервал между блоками стола (минуты, сервер)
+                <input
+                  type="number"
+                  min="1"
+                  max="120"
+                  step="1"
+                  className="admin-comment-input admin-pl-field"
+                  value={hostCfgDeskMinInterval}
+                  onChange={(e) => setHostCfgDeskMinInterval(Number(e.target.value || 1))}
+                  disabled={!hostCfgRequestDesk}
+                />
+              </label>
+              <label className="admin-pl-label">
+                Вероятность короткой реплики (бантер), 0…1
+                <input
+                  type="number"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  className="admin-comment-input admin-pl-field"
+                  value={hostCfgDeskBanterChance}
+                  onChange={(e) => setHostCfgDeskBanterChance(Number(e.target.value))}
+                  disabled={!hostCfgRequestDesk}
+                />
+              </label>
+              <label className="admin-pl-label">
+                Интро (можно пусто)
+                <textarea
+                  className="admin-comment-input admin-pl-textarea"
+                  rows={2}
+                  maxLength={500}
+                  value={hostCfgDeskIntro}
+                  onChange={(e) => setHostCfgDeskIntro(e.target.value)}
+                  disabled={!hostCfgRequestDesk}
+                  placeholder="Например: Слушаем пожелание из чата."
+                />
+              </label>
+              <label className="admin-pl-label">
+                Основной текст (шаблон)
+                <textarea
+                  className="admin-comment-input admin-pl-textarea"
+                  rows={3}
+                  maxLength={800}
+                  value={hostCfgDeskBody}
+                  onChange={(e) => setHostCfgDeskBody(e.target.value)}
+                  disabled={!hostCfgRequestDesk}
+                  placeholder="Пишет {user}: {text}."
+                />
+              </label>
+              <label className="admin-pl-label">
+                Аутро (можно пусто)
+                <textarea
+                  className="admin-comment-input admin-pl-textarea"
+                  rows={2}
+                  maxLength={500}
+                  value={hostCfgDeskOutro}
+                  onChange={(e) => setHostCfgDeskOutro(e.target.value)}
+                  disabled={!hostCfgRequestDesk}
+                />
+              </label>
+              <label className="admin-pl-label">
+                Бантер (опционально, подстановка {'{user}'})
+                <textarea
+                  className="admin-comment-input admin-pl-textarea"
+                  rows={2}
+                  maxLength={300}
+                  value={hostCfgDeskBanterTpl}
+                  onChange={(e) => setHostCfgDeskBanterTpl(e.target.value)}
+                  disabled={!hostCfgRequestDesk}
+                  placeholder="Спасибо, {user}, что с нами!"
+                />
               </label>
               <div className="admin-pl-form-actions">
                 <button type="submit" className="admin-btn admin-pl-submit" disabled={hostCfgSaving}>

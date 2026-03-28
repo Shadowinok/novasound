@@ -23,7 +23,8 @@ export default function RadioHost() {
     releaseMusicDuck,
     pauseForHost,
     resumeAfterHost,
-    advanceRadioAfterHost
+    advanceRadioAfterHost,
+    advanceRadioQueueAfterTrackEnd
   } = usePlayer();
 
   const [hostNews, setHostNews] = useState([]);
@@ -55,6 +56,12 @@ export default function RadioHost() {
   const DUCK_MUSIC_FACTOR = 0.09;
   /** Громкость голоса ведущего относительно пользовательской громкости плеера */
   const HOST_VOICE_FACTOR = 0.72;
+  /** Защита от зависаний TTS: после таймаута сценарий принудительно завершаем. */
+  const SPEAK_TIMEOUT_MS = 12000;
+  /** Верхняя граница окна «захода» голоса на хвост трека (сек); внутри — случайный момент, не жёсткие 5 с каждый раз. */
+  const HOST_OVERLAP_WINDOW_MAX_SEC = 5;
+  /** Пауза «как на радио» между окончанием реплики и стартом следующей песни (мс). */
+  const HOST_INTERTRACK_GAP_MS = 2500;
   const lastNewsBlockAtRef = useRef(0);
   const lastHourlyNewsKeyRef = useRef('');
   const lastFormatRef = useRef('');
@@ -63,16 +70,27 @@ export default function RadioHost() {
   const newsBedMasterGainRef = useRef(null);
   const newsBedNodesRef = useRef([]);
   const newsBedPulseTimerRef = useRef(null);
+  const newsBedAudioRef = useRef(null);
   const hostEventQueueRef = useRef([]);
   const hostEventBusyRef = useRef(false);
   const hostEventPumpTimerRef = useRef(null);
   const hostTrackCounterRef = useRef(0);
+  /** Стол заказов в эфире: счётчик треков и настройки с публичного host-settings */
+  const deskTrackCounterRef = useRef(0);
+  const deskHostRef = useRef({ enabled: false, everySongs: 6 });
   const lastCountedSlotKeyRef = useRef('');
   const hostNextAfterTracksRef = useRef(2);
   const livePlaybackSlotKeyRef = useRef('');
   const liveIsRadioModeRef = useRef(false);
   const livePlayingRef = useRef(false);
   const lastAnnouncedBlockIdRef = useRef('');
+  /**
+   * Обычные реплики, стол, смена блока — строго после события `ended` (трек доигрывает до конца).
+   * null | { trackId: string, payload: object }
+   */
+  const pendingAtTrackEndRef = useRef(null);
+  const advanceRadioEndRef = useRef(advanceRadioQueueAfterTrackEnd);
+  advanceRadioEndRef.current = advanceRadioQueueAfterTrackEnd;
 
   const activeNow = isRadioMode && currentTrack ? currentTrack : null;
   const currentTrackId = currentTrack?._id ? String(currentTrack._id) : '';
@@ -175,6 +193,10 @@ export default function RadioHost() {
       const randomMaxSongsRaw = Math.max(1, Math.min(20, Number(data?.randomMaxSongs) || 5));
       const randomMaxSongs = Math.max(randomMinSongs, randomMaxSongsRaw);
       setHostSchedule({ mode, fixedEverySongs, randomMinSongs, randomMaxSongs });
+      deskHostRef.current = {
+        enabled: !!data?.requestDeskEnabled,
+        everySongs: Math.max(1, Math.min(40, Number(data?.requestDeskEverySongs) || 6))
+      };
     } catch (_) {}
   }, []);
 
@@ -365,53 +387,33 @@ export default function RadioHost() {
     return tryVoice(0);
   };
 
-  const startNewsBed = useCallback(() => {
+  const startNewsBed = useCallback((bedOpts = {}) => {
     try {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (!AudioCtx) return;
-      if (newsBedCtxRef.current) return;
-      const ctx = new AudioCtx();
-      const master = ctx.createGain();
-      master.gain.value = 0.0001;
-      master.connect(ctx.destination);
-      if (ctx.state === 'suspended') {
-        try { ctx.resume(); } catch (_) {}
-      }
-
-      const pulse = (baseFreq = 392) => {
-        const t0 = ctx.currentTime;
-        const notes = [baseFreq, baseFreq * 1.25, baseFreq * 1.5];
-        notes.forEach((f, idx) => {
-          const osc = ctx.createOscillator();
-          osc.type = 'triangle';
-          osc.frequency.value = f;
-          const g = ctx.createGain();
-          g.gain.value = 0.0001;
-          osc.connect(g);
-          g.connect(master);
-          const startAt = t0 + (idx * 0.06);
-          g.gain.setValueAtTime(0.0001, startAt);
-          g.gain.linearRampToValueAtTime(0.038, startAt + 0.05);
-          g.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.45);
-          osc.start(startAt);
-          osc.stop(startAt + 0.5);
-          newsBedNodesRef.current.push({ osc, gain: g });
+      if (!liveIsRadioModeRef.current || !livePlayingRef.current) return;
+      if (newsBedAudioRef.current) return;
+      const bed = new Audio('/news-bed/breaking-news-intro.mp3');
+      bed.loop = true;
+      const vol = typeof bedOpts.volume === 'number' ? bedOpts.volume : 0.22;
+      // Новости — чуть громче; межтрековый линк — тише, чтобы не давить эфир.
+      bed.volume = Math.max(0.08, Math.min(0.35, vol));
+      newsBedAudioRef.current = bed;
+      const maybePromise = bed.play();
+      if (maybePromise && typeof maybePromise.catch === 'function') {
+        maybePromise.catch(() => {
+          if (newsBedAudioRef.current === bed) newsBedAudioRef.current = null;
         });
-      };
-
-      newsBedCtxRef.current = ctx;
-      newsBedMasterGainRef.current = master;
-      const now = ctx.currentTime;
-      master.gain.cancelScheduledValues(now);
-      master.gain.linearRampToValueAtTime(0.14, now + 0.45);
-      pulse(392);
-      newsBedPulseTimerRef.current = window.setInterval(() => {
-        pulse(Math.random() < 0.5 ? 392 : 440);
-      }, 2200);
+      }
     } catch (_) {}
   }, []);
 
   const stopNewsBed = useCallback(() => {
+    if (newsBedAudioRef.current) {
+      try {
+        newsBedAudioRef.current.pause();
+        newsBedAudioRef.current.currentTime = 0;
+      } catch (_) {}
+      newsBedAudioRef.current = null;
+    }
     const ctx = newsBedCtxRef.current;
     if (!ctx) return;
     try {
@@ -449,14 +451,78 @@ export default function RadioHost() {
   }, []);
 
   const speakHostForTrack = useCallback(async (opts = {}) => {
-    const duckFactor = Math.max(0, Math.min(1, Number(opts.duckFactor ?? DUCK_MUSIC_FACTOR)));
-    const forceFormat = String(opts.forceFormat || '');
-    const announceMode = String(opts.announceMode || 'future');
-    const pauseMusic = Boolean(opts.pauseMusic);
-    const advanceToNextAfterSpeak = Boolean(opts.advanceToNextAfterSpeak);
-    const allowNewsJoke = Boolean(opts.allowNewsJoke);
+    const rawOpts = opts && typeof opts === 'object' ? opts : {};
+    const useMusicBed = Boolean(rawOpts.useMusicBed);
+    const runDeskAfter = Boolean(rawOpts.runDeskAfter);
+    const includeMainHost = rawOpts.includeMainHost !== false;
+    const afterNaturalTrackEnd = Boolean(rawOpts.afterNaturalTrackEnd);
+
+    let merged = { ...rawOpts };
+    if (rawOpts.pendingBlockSwitch) {
+      const p = rawOpts.pendingBlockSwitch;
+      merged = {
+        ...merged,
+        forceFormat: 'block-switch',
+        prevBlockId: p.prevBlockId,
+        nextBlockId: p.nextBlockId,
+        pendingBlockSwitch: undefined
+      };
+    }
+
+    const duckFactor = Math.max(0, Math.min(1, Number(merged.duckFactor ?? DUCK_MUSIC_FACTOR)));
+    const forceFormat = String(merged.forceFormat || '');
+    const announceMode = String(merged.announceMode || 'future');
+    const pauseMusic = Boolean(merged.pauseMusic);
+    const advanceToNextAfterSpeak = Boolean(merged.advanceToNextAfterSpeak);
+    const allowNewsJoke = Boolean(merged.allowNewsJoke);
+
+    if (!includeMainHost && !runDeskAfter) return;
+
+    if (!includeMainHost && runDeskAfter && forceFormat !== 'news-block') {
+      if (!isRadioMode || !activeNow) return;
+      if (!afterNaturalTrackEnd && !playing) return;
+      const trackKey = playbackSlotKey;
+      const trackIdAtSpeakStart = currentTrackId;
+      if (!trackKey || !trackIdAtSpeakStart) return;
+      try {
+        if (hostPlayingRef.current) return;
+        hostPlayingRef.current = true;
+        if (!afterNaturalTrackEnd && pauseMusic && isRadioMode) pauseForHost();
+        if (useMusicBed) startNewsBed({ volume: 0.16 });
+        const { data } = await client.post('/chat/desk/broadcast-claim');
+        if (data && !data.skip && data.tts) {
+          const playedDesk = await speakLine(String(data.tts), '+0%', {
+            shouldAbortBeforePlay: () =>
+              !liveIsRadioModeRef.current
+              || (!afterNaturalTrackEnd && !livePlayingRef.current)
+              || livePlaybackSlotKeyRef.current !== trackKey
+          });
+          if (playedDesk) lastSpokenKeyRef.current = trackKey;
+        }
+      } catch (_) {
+      } finally {
+        if (useMusicBed) stopNewsBed();
+        if (afterNaturalTrackEnd) {
+          await new Promise((r) => setTimeout(r, HOST_INTERTRACK_GAP_MS));
+          releaseMusicDuck();
+          hostPlayingRef.current = false;
+        } else if (pauseMusic && isRadioMode) {
+          if (advanceToNextAfterSpeak) {
+            await new Promise((r) => setTimeout(r, HOST_INTERTRACK_GAP_MS));
+            const moved = await advanceRadioAfterHost(trackIdAtSpeakStart);
+            if (!moved) resumeAfterHost();
+          } else {
+            resumeAfterHost();
+          }
+        }
+        if (!afterNaturalTrackEnd) releaseMusicDuck();
+        if (!afterNaturalTrackEnd) hostPlayingRef.current = false;
+      }
+      return;
+    }
+
     if (!isRadioMode) return;
-    if (!playing) return;
+    if (!afterNaturalTrackEnd && !playing) return;
     if (!activeNow) return;
     const trackKey = playbackSlotKey;
     const trackIdAtSpeakStart = currentTrackId;
@@ -842,8 +908,8 @@ export default function RadioHost() {
 
     if (format === 'block-switch') {
       lastFormatRef.current = 'block-switch';
-      const prevBlockId = String(opts.prevBlockId || '');
-      const nextBlockId = String(opts.nextBlockId || '');
+      const prevBlockId = String(merged.prevBlockId || '');
+      const nextBlockId = String(merged.nextBlockId || '');
       if (prevBlockId && nextBlockId && prevBlockId !== nextBlockId) {
         scriptLines.push(randPick([
           `Плавно выходим из блока «${blockLabel(prevBlockId)}».`,
@@ -970,10 +1036,16 @@ export default function RadioHost() {
       }
     }
 
+    const isNewsBlockFmt = forceFormat === 'news-block';
+
     try {
       if (hostPlayingRef.current) return;
       hostPlayingRef.current = true;
-      if (forceFormat === 'news-block') startNewsBed();
+      if (!afterNaturalTrackEnd && pauseMusic && isRadioMode && (useMusicBed || isNewsBlockFmt)) {
+        pauseForHost();
+      }
+      if (isNewsBlockFmt) startNewsBed({ volume: 0.22 });
+      else if (useMusicBed) startNewsBed({ volume: 0.16 });
       // Один запрос вместо серии фраз: меньше сетевых пауз между репликами.
       const fullScript = scriptLines
         .map((line) => String(line || '').trim())
@@ -982,7 +1054,7 @@ export default function RadioHost() {
       let duckApplied = false;
       const isOutdatedSpeech = () => (
         !liveIsRadioModeRef.current
-        || !livePlayingRef.current
+        || (!afterNaturalTrackEnd && !livePlayingRef.current)
         || !livePlaybackSlotKeyRef.current
         || livePlaybackSlotKeyRef.current !== trackKey
       );
@@ -990,43 +1062,89 @@ export default function RadioHost() {
         hostPlayingRef.current = false;
         return;
       }
-      const played = await speakLine(fullScript, pickRateByVibe(), {
-        shouldAbortBeforePlay: isOutdatedSpeech,
-        onPlaybackStart: () => {
-          if (isOutdatedSpeech()) return;
-          if (pauseMusic && isRadioMode) pauseForHost();
-          if (duckApplied) return;
-          duckApplied = true;
-          applyMusicDuck(duckFactor);
-        }
+      let timeoutId = null;
+      let timeoutDone = false;
+      const timeoutPromise = new Promise((resolve) => {
+        timeoutId = window.setTimeout(() => {
+          timeoutDone = true;
+          if (ttsAudioRef.current) {
+            try { ttsAudioRef.current.pause(); } catch (_) {}
+            ttsAudioRef.current = null;
+          }
+          resolve(false);
+        }, SPEAK_TIMEOUT_MS);
       });
-      if (played) {
+      const played = await Promise.race([
+        speakLine(fullScript, pickRateByVibe(), {
+          shouldAbortBeforePlay: isOutdatedSpeech,
+          onPlaybackStart: () => {
+            if (isOutdatedSpeech()) return;
+            if (!afterNaturalTrackEnd && pauseMusic && isRadioMode && !useMusicBed && !isNewsBlockFmt) {
+              pauseForHost();
+            }
+            if (duckApplied) return;
+            duckApplied = true;
+            if (!afterNaturalTrackEnd && !(pauseMusic && isRadioMode && (useMusicBed || isNewsBlockFmt))) {
+              applyMusicDuck(duckFactor);
+            }
+          }
+        }),
+        timeoutPromise
+      ]);
+      if (!timeoutDone && timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+      let deskPlayed = false;
+      if (runDeskAfter) {
+        try {
+          const { data } = await client.post('/chat/desk/broadcast-claim');
+          if (data && !data.skip && data.tts) {
+            deskPlayed = await speakLine(String(data.tts), pickRateByVibe(), {
+              shouldAbortBeforePlay: isOutdatedSpeech,
+              onPlaybackStart: () => {}
+            });
+          }
+        } catch (_) {}
+      }
+      if (played || deskPlayed) {
         lastSpokenKeyRef.current = trackKey;
+      }
+      if (played) {
         if (shouldAnnounceEpisode) {
           lastEpisodeAnnouncedRef.current = epId;
         }
       }
-      if (newsItemsForBlock.length) {
-        const nextSpoken = [...spokenTitlesRef.current, ...newsItemsForBlock].slice(-12);
-        spokenTitlesRef.current = nextSpoken;
-      } else if (best?.title) {
-        const nextSpoken = [...spokenTitlesRef.current, String(best.title || '')].slice(-12);
-        spokenTitlesRef.current = nextSpoken;
+      if (played) {
+        if (newsItemsForBlock.length) {
+          const nextSpoken = [...spokenTitlesRef.current, ...newsItemsForBlock].slice(-12);
+          spokenTitlesRef.current = nextSpoken;
+        } else if (best?.title) {
+          const nextSpoken = [...spokenTitlesRef.current, String(best.title || '')].slice(-12);
+          spokenTitlesRef.current = nextSpoken;
+        }
       }
     } catch (_) {
       // TTS недоступен
     } finally {
-      if (pauseMusic && isRadioMode) {
-        if (advanceToNextAfterSpeak) {
-          const moved = await advanceRadioAfterHost(trackIdAtSpeakStart);
-          if (!moved) resumeAfterHost();
-        } else {
-          resumeAfterHost();
+      if (afterNaturalTrackEnd) {
+        releaseMusicDuck();
+        if (isNewsBlockFmt || useMusicBed) stopNewsBed();
+        await new Promise((r) => setTimeout(r, HOST_INTERTRACK_GAP_MS));
+        hostPlayingRef.current = false;
+      } else {
+        if (pauseMusic && isRadioMode) {
+          if (advanceToNextAfterSpeak) {
+            await new Promise((r) => setTimeout(r, HOST_INTERTRACK_GAP_MS));
+            const moved = await advanceRadioAfterHost(trackIdAtSpeakStart);
+            if (!moved) resumeAfterHost();
+          } else {
+            resumeAfterHost();
+          }
         }
+        releaseMusicDuck();
+        if (isNewsBlockFmt || useMusicBed) stopNewsBed();
+        hostPlayingRef.current = false;
       }
-      releaseMusicDuck();
-      if (forceFormat === 'news-block') stopNewsBed();
-      hostPlayingRef.current = false;
     }
   }, [
     activeNow,
@@ -1068,12 +1186,40 @@ export default function RadioHost() {
       const next = queueItems.shift();
       hostEventQueueRef.current = queueItems;
       if (!next) return;
-      if (String(next.slotKey || '') !== playbackSlotKey && next.type !== 'hour-news') return;
+      if (String(next.slotKey || '') !== playbackSlotKey) return;
       await speakHostForTrack(next.payload || {});
     } finally {
       hostEventBusyRef.current = false;
     }
   }, [isRadioMode, playbackSlotKey, playing, speakHostForTrack]);
+
+  useEffect(() => {
+    const onRadioTrackEnded = (e) => {
+      if (!isRadioMode) return;
+      const endedId = e.detail?.endedId;
+      if (!endedId) return;
+      const pending = pendingAtTrackEndRef.current;
+      if (!pending || String(pending.trackId) !== String(endedId)) {
+        if (pending && String(pending.trackId) !== String(endedId)) {
+          pendingAtTrackEndRef.current = null;
+        }
+        return;
+      }
+      e.preventDefault();
+      pendingAtTrackEndRef.current = null;
+      const { payload } = pending;
+      void (async () => {
+        try {
+          await speakHostForTrack(payload);
+        } catch (_) {
+          /* реплика не обязана всегда состояться */
+        }
+        await advanceRadioEndRef.current(endedId);
+      })();
+    };
+    window.addEventListener('novasound_radio_track_ended', onRadioTrackEnded);
+    return () => window.removeEventListener('novasound_radio_track_ended', onRadioTrackEnded);
+  }, [isRadioMode, speakHostForTrack]);
 
   const enqueueHostEvent = useCallback((event) => {
     const item = event && typeof event === 'object' ? event : null;
@@ -1098,61 +1244,47 @@ export default function RadioHost() {
     }, 0);
   }, [playbackSlotKey, processNextHostEvent]);
 
-  const scheduleSpeakForTrack = useCallback(() => {
+  /**
+   * Программное прерывание эфира: часовые новости — в случайный момент последних ~5 с трека (пауза + фон + TTS).
+   * Обычные реплики ведущего не используют этот планировщик — только после полного окончания трека.
+   */
+  const scheduleHourlyNewsInterrupt = useCallback(() => {
     if (speakScheduleTimerRef.current) {
       window.clearTimeout(speakScheduleTimerRef.current);
       speakScheduleTimerRef.current = null;
     }
-    const remainingSec = Math.max(
-      0,
-      Number(duration || currentTrack?.duration || 0) - Number(progress || 0)
-    );
-    // 30% начало, 20% без наложения, 20% склейка, 30% конец.
-    const roll = Math.random();
-    let delayMs = 700;
-    let duckFactor = DUCK_MUSIC_FACTOR;
-    let announceMode = 'future';
-    let pauseMusic = false;
-    let advanceToNextAfterSpeak = false;
-    if (roll < 0.3) {
-      delayMs = 700;
-      duckFactor = 0.1;
-      announceMode = 'program';
-    } else if (roll < 0.5) {
-      // "Честный" межтрековый брейк: перед концом трека ставим паузу, говорим и запускаем следующий.
-      delayMs = Math.max(250, Math.min(12000, (remainingSec - 0.18) * 1000));
-      duckFactor = 0;
-      announceMode = 'program';
-      pauseMusic = true;
-      advanceToNextAfterSpeak = true;
-    } else if (roll < 0.7) {
-      delayMs = Math.max(450, Math.min(14000, (remainingSec - 2.2) * 1000));
-      duckFactor = 0.09;
-      announceMode = 'future';
-    } else {
-      delayMs = Math.max(450, Math.min(14000, (remainingSec - 6.0) * 1000));
-      duckFactor = 0.09;
-      announceMode = 'future';
-    }
-    if (!Number.isFinite(delayMs) || delayMs < 0) delayMs = 700;
+    const dur = Number(duration || currentTrack?.duration || 0);
+    const prog = Number(progress || 0);
+    const remainingSec = Math.max(0, dur - prog);
+    const latestStart = Math.max(0.08, Math.min(HOST_OVERLAP_WINDOW_MAX_SEC, remainingSec - 0.06));
+    const earliestStart = Math.min(latestStart, Math.max(0.1, latestStart * 0.25));
+    const rEarly = earliestStart + Math.random() * Math.max(0.01, latestStart - earliestStart);
+    let delayMs = Math.round(Math.max(0, remainingSec - rEarly) * 1000);
+    delayMs = Math.max(40, delayMs);
+
     const slotKeyAtSchedule = playbackSlotKey;
     speakScheduleTimerRef.current = window.setTimeout(() => {
       speakScheduleTimerRef.current = null;
       enqueueHostEvent({
         type: 'inter-track',
-        priority: 10,
+        priority: 100,
         slotKey: slotKeyAtSchedule,
-        dedupeKey: `inter-track:${slotKeyAtSchedule}`,
+        dedupeKey: `hour-news:${slotKeyAtSchedule}:${Date.now()}`,
         payload: {
-          duckFactor,
-          announceMode,
-          pauseMusic,
-          advanceToNextAfterSpeak,
-          allowNewsJoke: pauseMusic && advanceToNextAfterSpeak
+          forceFormat: 'news-block',
+          includeMainHost: true,
+          runDeskAfter: false,
+          duckFactor: 0,
+          announceMode: 'future',
+          pauseMusic: true,
+          advanceToNextAfterSpeak: true,
+          allowNewsJoke: true,
+          useMusicBed: false,
+          afterNaturalTrackEnd: false
         }
       });
     }, delayMs);
-  }, [DUCK_MUSIC_FACTOR, currentTrack?.duration, duration, progress, playbackSlotKey, enqueueHostEvent]);
+  }, [currentTrack?.duration, duration, progress, playbackSlotKey, enqueueHostEvent]);
 
   useEffect(() => {
     if (!isRadioMode || !playing || !playbackSlotKey) return;
@@ -1161,18 +1293,57 @@ export default function RadioHost() {
     if (lastCountedSlotKeyRef.current === playbackSlotKey) return;
     lastCountedSlotKeyRef.current = playbackSlotKey;
     hostTrackCounterRef.current += 1;
-    if (hostTrackCounterRef.current < hostNextAfterTracksRef.current) return;
-    hostTrackCounterRef.current = 0;
-    const mode = hostSchedule.mode === 'random' ? 'random' : 'fixed';
-    if (mode === 'random') {
-      const min = Math.max(1, Number(hostSchedule.randomMinSongs) || 2);
-      const max = Math.max(min, Number(hostSchedule.randomMaxSongs) || 5);
-      hostNextAfterTracksRef.current = Math.floor(min + Math.random() * (max - min + 1));
+
+    const dh = deskHostRef.current;
+    let deskDue = false;
+    if (dh.enabled) {
+      deskTrackCounterRef.current += 1;
+      if (deskTrackCounterRef.current >= dh.everySongs) {
+        deskTrackCounterRef.current = 0;
+        deskDue = true;
+      }
     } else {
-      hostNextAfterTracksRef.current = Math.max(1, Number(hostSchedule.fixedEverySongs) || 2);
+      deskTrackCounterRef.current = 0;
     }
-    scheduleSpeakForTrack();
-  }, [isRadioMode, playing, playbackSlotKey, scheduleSpeakForTrack, hostSchedule]);
+
+    let hostDue = false;
+    if (hostTrackCounterRef.current >= hostNextAfterTracksRef.current) {
+      hostTrackCounterRef.current = 0;
+      hostDue = true;
+      const mode = hostSchedule.mode === 'random' ? 'random' : 'fixed';
+      if (mode === 'random') {
+        const min = Math.max(1, Number(hostSchedule.randomMinSongs) || 2);
+        const max = Math.max(min, Number(hostSchedule.randomMaxSongs) || 5);
+        hostNextAfterTracksRef.current = Math.floor(min + Math.random() * (max - min + 1));
+      } else {
+        hostNextAfterTracksRef.current = Math.max(1, Number(hostSchedule.fixedEverySongs) || 2);
+      }
+    }
+
+    if (!hostDue && !deskDue) return;
+    const tid = currentTrackId;
+    if (!tid) return;
+
+    const baseEndPayload = {
+      includeMainHost: false,
+      runDeskAfter: false,
+      duckFactor: 0,
+      announceMode: 'future',
+      pauseMusic: false,
+      advanceToNextAfterSpeak: false,
+      allowNewsJoke: true,
+      useMusicBed: true,
+      afterNaturalTrackEnd: true
+    };
+    const cur = pendingAtTrackEndRef.current;
+    const payload =
+      cur && cur.trackId === tid
+        ? { ...cur.payload }
+        : { ...baseEndPayload };
+    payload.includeMainHost = Boolean(payload.includeMainHost) || hostDue;
+    payload.runDeskAfter = Boolean(payload.runDeskAfter) || deskDue;
+    pendingAtTrackEndRef.current = { trackId: tid, payload };
+  }, [currentTrackId, isRadioMode, playing, playbackSlotKey, hostSchedule]);
 
   useEffect(() => {
     const nextId = String(currentTimeBlock?.id || '');
@@ -1183,24 +1354,32 @@ export default function RadioHost() {
       return;
     }
     if (prevId === nextId) return;
-    if (isRadioMode && playing && playbackSlotKey) {
-      enqueueHostEvent({
-        type: 'block-switch',
-        priority: 2,
-        slotKey: playbackSlotKey,
-        dedupeKey: `block-switch:${prevId}->${nextId}:${playbackSlotKey}`,
-        payload: {
-          forceFormat: 'block-switch',
-          announceMode: 'future',
-          duckFactor: 0.08,
-          pauseMusic: false,
-          prevBlockId: prevId,
-          nextBlockId: nextId
-        }
-      });
+    if (isRadioMode && playing && playbackSlotKey && currentTrackId) {
+      const tid = String(currentTrackId);
+      const baseEndPayload = {
+        includeMainHost: false,
+        runDeskAfter: false,
+        duckFactor: 0,
+        announceMode: 'future',
+        pauseMusic: false,
+        advanceToNextAfterSpeak: false,
+        allowNewsJoke: true,
+        useMusicBed: true,
+        afterNaturalTrackEnd: true
+      };
+      const cur = pendingAtTrackEndRef.current;
+      const payload =
+        cur && cur.trackId === tid
+          ? { ...cur.payload, includeMainHost: true, pendingBlockSwitch: { prevBlockId: prevId, nextBlockId: nextId } }
+          : {
+              ...baseEndPayload,
+              includeMainHost: true,
+              pendingBlockSwitch: { prevBlockId: prevId, nextBlockId: nextId }
+            };
+      pendingAtTrackEndRef.current = { trackId: tid, payload };
     }
     lastAnnouncedBlockIdRef.current = nextId;
-  }, [currentTimeBlock, enqueueHostEvent, isRadioMode, playbackSlotKey, playing]);
+  }, [currentTimeBlock, currentTrackId, isRadioMode, playbackSlotKey, playing]);
 
   useEffect(() => {
     if (playing) return;
@@ -1227,16 +1406,10 @@ export default function RadioHost() {
         window.clearTimeout(speakScheduleTimerRef.current);
         speakScheduleTimerRef.current = null;
       }
-      enqueueHostEvent({
-        type: 'hour-news',
-        priority: 100,
-        slotKey: livePlaybackSlotKeyRef.current,
-        dedupeKey: `hour-news:${hourKey}`,
-        payload: { forceFormat: 'news-block', duckFactor: 0, pauseMusic: true }
-      });
+      scheduleHourlyNewsInterrupt();
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [isRadioMode, playing, enqueueHostEvent]);
+  }, [isRadioMode, playing, scheduleHourlyNewsInterrupt]);
 
   useEffect(() => {
     if (!isRadioMode || !playing) return;
@@ -1247,15 +1420,16 @@ export default function RadioHost() {
   }, [isRadioMode, playing, playbackSlotKey, processNextHostEvent]);
 
   useEffect(() => {
-    if (playing) return;
-    if (hostPlayingRef.current) return;
+    if (isRadioMode && playing) return;
     if (ttsAudioRef.current) {
       try { ttsAudioRef.current.pause(); } catch (_) {}
       ttsAudioRef.current = null;
     }
     hostPlayingRef.current = false;
+    hostEventBusyRef.current = false;
+    stopNewsBed();
     releaseMusicDuck();
-  }, [playing, releaseMusicDuck]);
+  }, [isRadioMode, playing, releaseMusicDuck, stopNewsBed]);
 
   useEffect(() => () => {
     if (newsBedPulseTimerRef.current) {

@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 const items = [
   { path: '/', label: 'Главная', icon: '⌂' },
   { path: '/radio', label: 'Радио', icon: '◐' },
+  { path: '/chat', label: 'Чат', icon: '✉' },
   { path: '/catalog', label: 'Каталог', icon: '♫' },
   { path: '/charts', label: 'Чарты', icon: '▣' },
   { path: '/playlists', label: 'Плейлисты', icon: '◉' },

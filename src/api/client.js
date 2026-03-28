@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { Capacitor } from '@capacitor/core';
 
 /**
  * База API. На Vercel (и dev) — относительный /api → тот же origin, прокси в vercel.json, без CORS к Render.
@@ -9,6 +10,10 @@ function getApiBase() {
   // В index.html можно задать без пересборки: window.NOVASOUND_API_BASE = 'https://.../api'
   if (typeof window !== 'undefined' && window.NOVASOUND_API_BASE) {
     return String(window.NOVASOUND_API_BASE).replace(/\/$/, '');
+  }
+  // Capacitor WebView: hostname часто localhost — не относительный /api (нет прокси на устройстве)
+  if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
+    return 'https://novasound-api.onrender.com/api';
   }
   if (typeof window !== 'undefined') {
     const h = window.location.hostname;
@@ -71,7 +76,8 @@ export const auth = {
 };
 
 export const users = {
-  deleteMe: (password) => client.delete('/users/me', { data: { password } })
+  deleteMe: (password) => client.delete('/users/me', { data: { password } }),
+  search: (q) => client.get('/users/search', { params: { q } })
 };
 
 export const tracks = {
@@ -290,7 +296,8 @@ export const admin = {
   approveTrack: (id, comment) => client.put(`/admin/tracks/${id}/approve`, { comment }),
   rejectTrack: (id, comment) => client.put(`/admin/tracks/${id}/reject`, { comment }),
   trackReports: (status) => client.get('/admin/track-reports', { params: { status: status || 'open' } }),
-  resolveTrackReport: (reportId, action, adminComment) => client.put(`/admin/track-reports/${reportId}/resolve`, { action, adminComment })
+  resolveTrackReport: (reportId, action, adminComment) => client.put(`/admin/track-reports/${reportId}/resolve`, { action, adminComment }),
+  setUserRole: (userId, role) => client.put(`/admin/users/${userId}/role`, { role })
 };
 
 export const campaigns = {
@@ -298,6 +305,32 @@ export const campaigns = {
   submitTrack: (campaignId, trackId, source = 'manual-send') =>
     client.post(`/campaigns/${campaignId}/submit-track`, { trackId, source })
 };
+
+export const chat = {
+  settings: () => client.get('/chat/settings'),
+  generalChannel: () => client.get('/chat/general-channel'),
+  channels: () => client.get('/chat/channels'),
+  createGroup: (title, memberIds) => client.post('/chat/groups', { title, memberIds }),
+  openDm: (userId) => client.post(`/chat/dm/${userId}`),
+  messages: (channelId, params) => client.get(`/chat/channels/${channelId}/messages`, { params }),
+  sendMessage: (channelId, text) => client.post(`/chat/channels/${channelId}/messages`, { text }),
+  deleteMessage: (messageId) => client.delete(`/chat/messages/${messageId}`),
+  sendRequest: (text) => client.post('/chat/requests', { text }),
+  requests: (status) => client.get('/chat/requests', { params: { status } }),
+  updateRequestStatus: (id, status) => client.patch(`/chat/requests/${id}`, { status }),
+  pickRandomRequest: () => client.post('/chat/requests/pick-random'),
+  deskBroadcastClaim: () => client.post('/chat/desk/broadcast-claim'),
+  muteUser: (userId, hours, reason) =>
+    client.post('/chat/mutes', { userId, hours, ...(reason != null && reason !== '' ? { reason: String(reason) } : {}) }),
+  unmuteUser: (userId) => client.delete(`/chat/mutes/${userId}`),
+  reports: (status) => client.get('/chat/reports', { params: { status: status || 'open' } }),
+  updateReport: (id, payload) => client.patch(`/chat/reports/${id}`, payload),
+  reportMessage: (messageId, text) =>
+    client.post(`/chat/messages/${messageId}/report`, text != null && text !== '' ? { text: String(text) } : {})
+};
+
+
+
 
 /** URL стрима; для HTML5 <audio> JWT передаётся в query (?token=), заголовок туда не попадает */
 export function getAudioUrl(track) {

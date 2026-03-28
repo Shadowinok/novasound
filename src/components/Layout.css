@@ -1,10 +1,12 @@
 .layout {
   position: relative;
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  /* запас под радиальное меню/плеер + тонкую полоску футера */
-  padding-bottom: calc(clamp(100px, 22vw, 180px) + var(--footer-dock-height, 30px));
+  padding-top: var(--safe-top, env(safe-area-inset-top, 0px));
+  /* запас под радиальное меню/плеер + тонкую полоску футера + home indicator */
+  padding-bottom: calc(clamp(100px, 22vw, 180px) + var(--footer-dock-height, 30px) + var(--safe-bottom, env(safe-area-inset-bottom, 0px)));
 }
 
 .layout-shell {
@@ -18,7 +20,7 @@
 .header {
   position: relative;
   z-index: 10;
-  padding: 16px 24px;
+  padding: 16px calc(24px + var(--safe-right, env(safe-area-inset-right, 0px))) 16px calc(24px + var(--safe-left, env(safe-area-inset-left, 0px)));
   border-bottom: 1px solid rgba(5, 217, 232, 0.2);
   background: rgba(10, 10, 15, 0.7);
   backdrop-filter: blur(8px);
@@ -72,14 +74,19 @@
 }
 
 .msk-clock {
-  font-size: 0.78rem;
-  color: var(--text-dim);
+  font-size: 0.8rem;
+  color: rgba(238, 245, 255, 0.96);
+  font-weight: 700;
   letter-spacing: 0.06em;
+  text-shadow:
+    0 0 10px rgba(5, 217, 232, 0.35),
+    0 0 2px rgba(0, 0, 0, 0.65);
 }
 
 .msk-clock--secondary {
-  opacity: 0.78;
-  font-size: 0.72rem;
+  opacity: 0.96;
+  font-size: 0.74rem;
+  color: rgba(196, 236, 255, 0.92);
 }
 
 .nav-link {
@@ -116,7 +123,7 @@
   flex: 1 1 auto;
   max-width: 1200px;
   margin: 0 auto;
-  padding: 24px 16px;
+  padding: 24px calc(16px + var(--safe-right, env(safe-area-inset-right, 0px))) 24px calc(16px + var(--safe-left, env(safe-area-inset-left, 0px)));
   width: 100%;
   min-width: 0;
 }
@@ -134,7 +141,7 @@
   align-items: center;
   gap: 18px;
   min-height: var(--footer-dock-height, 30px);
-  padding: 4px 12px calc(4px + env(safe-area-inset-bottom, 0px));
+  padding: 4px calc(12px + env(safe-area-inset-right, 0px)) calc(4px + env(safe-area-inset-bottom, 0px)) calc(12px + env(safe-area-inset-left, 0px));
   font-size: 0.68rem;
   line-height: 1.3;
   letter-spacing: 0.06em;
@@ -156,10 +163,19 @@
 
 @media (max-width: 768px) {
   .layout {
-    padding-bottom: calc(clamp(88px, 28vw, 140px) + var(--footer-dock-height, 30px));
+    padding-bottom: calc(clamp(88px, 28vw, 140px) + var(--footer-dock-height, 30px) + var(--safe-bottom, env(safe-area-inset-bottom, 0px)));
   }
   .header {
-    padding: 10px 12px;
+    padding: 10px calc(12px + var(--safe-right, env(safe-area-inset-right, 0px))) 10px calc(12px + var(--safe-left, env(safe-area-inset-left, 0px)));
+  }
+  .auth-links .nav-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    min-width: 44px;
+    padding: 8px 12px;
+    box-sizing: border-box;
   }
   .header-inner {
     grid-template-columns: 1fr;
@@ -185,19 +201,23 @@
     font-size: clamp(1.1rem, 5vw, 1.5rem);
   }
   .main {
-    padding: 14px 10px 20px;
+    padding: 14px calc(10px + var(--safe-right, env(safe-area-inset-right, 0px))) 20px calc(10px + var(--safe-left, env(safe-area-inset-left, 0px)));
   }
 }
 
 @media (max-width: 480px) {
   .layout {
-    padding-bottom: calc(84px + var(--footer-dock-height, 30px));
+    padding-bottom: calc(84px + var(--footer-dock-height, 30px) + var(--safe-bottom, env(safe-area-inset-bottom, 0px)));
   }
   .user-name {
     font-size: clamp(0.85rem, 4vw, 1.05rem);
     max-width: 90vw;
   }
   .msk-clock {
-    font-size: 0.7rem;
+    font-size: 0.76rem;
+    letter-spacing: 0.05em;
+  }
+  .msk-clock--secondary {
+    font-size: 0.71rem;
   }
 }

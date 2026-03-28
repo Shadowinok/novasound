@@ -31,6 +31,8 @@ export function PlayerProvider({ children }) {
   const pausedByHostRef = useRef(false);
   const radioAutoResumeCooldownRef = useRef(0);
   const radioSwitchingAfterEndRef = useRef(false);
+  /** Следующий трек после естественного окончания (та же логика, что в audio `ended` для радио). */
+  const advanceRadioFromEndedRef = useRef(async () => {});
   const playerDebugRef = useRef(localStorage.getItem('novasound_player_debug') === '1');
 
   useEffect(() => {
@@ -167,36 +169,16 @@ export function PlayerProvider({ children }) {
     audio.addEventListener('ended', () => {
       radioSwitchingAfterEndRef.current = true;
       if (isRadioModeRef.current) {
-        const token = localStorage.getItem('novasound_token');
-        const isRadioPublic = !token;
         const endedId = track?._id ? String(track._id) : '';
-        tracksApi.radioNow({ limit: 30 })
-          .then(({ data }) => {
-            const now = data?.now || null;
-            const q = Array.isArray(data?.queue) ? data.queue : [];
-            if (now && q.length) {
-              let idx = q.findIndex((t) => String(t?._id) === String(now?._id));
-              if (idx < 0) idx = 0;
-              // Защита от "микроповтора": если сервер всё ещё считает текущим уже закончившийся трек,
-              // сразу перескакиваем на следующий элемент очереди.
-              if (endedId && String(q[idx]?._id || '') === endedId && q.length > 1) {
-                const nextIdx = (idx + 1) % q.length;
-                playQueueTrack(q[nextIdx], q, nextIdx, { startAtSec: 0, isRadioPublic });
-                return;
-              }
-              // В радио-переходах стартуем с начала трека, чтобы не было случайных оффсетов.
-              playQueueTrack(q[idx] || now, q, idx, { startAtSec: 0, isRadioPublic });
-              return;
-            }
-            radioSwitchingAfterEndRef.current = false;
-            setPlaying(false);
-            setProgress(0);
-          })
-          .catch(() => {
-            radioSwitchingAfterEndRef.current = false;
-            setPlaying(false);
-            setProgress(0);
-          });
+        const ev = new CustomEvent('novasound_radio_track_ended', {
+          cancelable: true,
+          detail: { endedId }
+        });
+        window.dispatchEvent(ev);
+        if (ev.defaultPrevented) {
+          return;
+        }
+        void advanceRadioFromEndedRef.current(endedId);
         return;
       }
 
@@ -252,6 +234,37 @@ export function PlayerProvider({ children }) {
     });
     if (token) tracksApi.play(track._id).catch(() => {});
   }, [debugLog, normalizeQueue, releaseAudio, resetPlayerState]);
+
+  /** То же, что раньше выполнялось в `ended` для радио до переключения трека (в т.ч. после речи ведущего между песнями). */
+  const advanceRadioQueueAfterTrackEnd = useCallback(async (endedId) => {
+    const token = localStorage.getItem('novasound_token');
+    const isRadioPublic = !token;
+    try {
+      const { data } = await tracksApi.radioNow({ limit: 30 });
+      const now = data?.now || null;
+      const q = Array.isArray(data?.queue) ? data.queue : [];
+      if (now && q.length) {
+        let idx = q.findIndex((t) => String(t?._id) === String(now?._id));
+        if (idx < 0) idx = 0;
+        if (endedId && String(q[idx]?._id || '') === endedId && q.length > 1) {
+          const nextIdx = (idx + 1) % q.length;
+          playQueueTrack(q[nextIdx], q, nextIdx, { startAtSec: 0, isRadioPublic });
+          return;
+        }
+        playQueueTrack(q[idx] || now, q, idx, { startAtSec: 0, isRadioPublic });
+        return;
+      }
+      radioSwitchingAfterEndRef.current = false;
+      setPlaying(false);
+      setProgress(0);
+    } catch (_) {
+      radioSwitchingAfterEndRef.current = false;
+      setPlaying(false);
+      setProgress(0);
+    }
+  }, [playQueueTrack]);
+
+  advanceRadioFromEndedRef.current = advanceRadioQueueAfterTrackEnd;
 
   const loadTrack = useCallback((track, options = {}) => {
     if (!track) {
@@ -537,6 +550,7 @@ export function PlayerProvider({ children }) {
       applyMusicDuck,
       releaseMusicDuck,
       advanceRadioAfterHost,
+      advanceRadioQueueAfterTrackEnd,
       setProgress,
       setDuration,
       closePlayer
